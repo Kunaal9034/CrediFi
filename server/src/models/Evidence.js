@@ -74,7 +74,7 @@ const evidenceSchema = new mongoose.Schema(
     // Blockchain verification metadata
     blockchainTx: {
       type: String,
-      required: true,
+      default: null,
       index: true
     },
     blockNumber: {
@@ -88,7 +88,7 @@ const evidenceSchema = new mongoose.Schema(
     blockchainStatus: {
       type: String,
       enum: ['CONFIRMED', 'PENDING', 'FAILED'],
-      default: 'CONFIRMED'
+      default: 'PENDING'
     },
     
     // Custodial tracking

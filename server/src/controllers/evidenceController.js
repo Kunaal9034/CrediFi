@@ -74,26 +74,30 @@ const registerEvidence = async (req, res, next) => {
 
     // 3. Register on-chain with Polygon Amoy
     console.log(`[Evidence] Registering hash on Polygon Amoy smart contract...`);
-    let blockchainTx = '0x0000000000000000000000000000000000000000000000000000000000000000';
+    let blockchainTx = null;
     let blockNumber = null;
-    let blockchainStatus = 'CONFIRMED';
+    let blockchainStatus = 'PENDING';
 
     try {
-      const actorWallet = req.user.walletAddress || undefined;
-      const onChainResult = await BlockchainService.registerEvidenceOnChain(
-        evidenceId,
-        caseDoc.caseId,
-        authoritativeSha256,
-        ipfsCid,
-        actorWallet
-      );
-      blockchainTx = onChainResult.transactionHash;
-      blockNumber = onChainResult.blockNumber;
+      if (BlockchainService.isReady()) {
+        const actorWallet = req.user.walletAddress || undefined;
+        const onChainResult = await BlockchainService.registerEvidenceOnChain(
+          evidenceId,
+          caseDoc.caseId,
+          authoritativeSha256,
+          ipfsCid,
+          actorWallet
+        );
+        blockchainTx = onChainResult.transactionHash;
+        blockNumber = onChainResult.blockNumber;
+        blockchainStatus = 'CONFIRMED';
+      } else {
+        console.log(`[Evidence] Smart contract / operator wallet pending configuration. Evidence recorded with blockchainStatus='PENDING'.`);
+      }
     } catch (bcErr) {
-      console.warn(`[Evidence] Blockchain write warning: ${bcErr.message}. Storing transaction state.`);
+      console.warn(`[Evidence] Blockchain write warning: ${bcErr.message}. Storing transaction state as PENDING.`);
       blockchainStatus = 'PENDING';
-      // In development/test mode if blockchain service is unconfigured
-      blockchainTx = `0x${authoritativeSha256}`;
+      blockchainTx = null;
     }
 
     // 4. Persist in MongoDB

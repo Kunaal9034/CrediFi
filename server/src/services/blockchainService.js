@@ -44,6 +44,13 @@ class BlockchainService {
   }
 
   /**
+   * Check if smart contract and operator wallet are fully configured
+   */
+  isReady() {
+    return Boolean(this.isInitialized && this.contract && this.wallet);
+  }
+
+  /**
    * Ensure service is initialized before performing operations
    */
   checkInitialization() {
