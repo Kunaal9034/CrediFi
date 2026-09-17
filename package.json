@@ -1,0 +1,27 @@
+{
+  "name": "justicevault",
+  "version": "1.0.0",
+  "description": "Tamper-Proof Digital Evidence & Chain-of-Custody Management System",
+  "scripts": {
+    "install:all": "npm install && cd blockchain && npm install && cd ../server && npm install && cd ../client && npm install",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "blockchain:test": "cd blockchain && npx hardhat test",
+    "server:test": "cd server && npm test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "keywords": [
+    "evidence-management",
+    "chain-of-custody",
+    "web3",
+    "blockchain",
+    "polygon",
+    "ipfs",
+    "tamper-proof"
+  ],
+  "author": "JusticeVault Team",
+  "license": "MIT"
+}
