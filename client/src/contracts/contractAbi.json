@@ -1,5 +1,7 @@
 {
   "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  "network": "hardhat",
+  "chainId": 31337,
   "abi": [
     {
       "inputs": [],
@@ -101,7 +103,7 @@
         {
           "indexed": false,
           "internalType": "string",
-          "name": "ipfsCid",
+          "name": "storageIdentifier",
           "type": "string"
         },
         {
@@ -272,7 +274,7 @@
         },
         {
           "internalType": "string",
-          "name": "ipfsCid",
+          "name": "storageIdentifier",
           "type": "string"
         },
         {
@@ -288,25 +290,6 @@
         {
           "internalType": "bool",
           "name": "exists",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "sha256Hash",
-          "type": "bytes32"
-        }
-      ],
-      "name": "isHashRegistered",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
           "type": "bool"
         }
       ],
@@ -389,7 +372,7 @@
         },
         {
           "internalType": "string",
-          "name": "ipfsCid",
+          "name": "storageIdentifier",
           "type": "string"
         },
         {

@@ -1,7 +1,10 @@
 node_modules/
 dist/
 build/
+coverage/
 .env
+.env.*
+!.env.example
 .env.local
 .env.*.local
 *.log
@@ -23,3 +26,6 @@ server/temp/*
 # System files
 .DS_Store
 Thumbs.db
+
+# Scratch and temporary scripts
+scratch/

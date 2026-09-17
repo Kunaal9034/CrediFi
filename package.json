@@ -8,6 +8,9 @@
     "dev:client": "cd client && npm run dev",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "blockchain:test": "cd blockchain && npx hardhat test",
+    "blockchain:compile": "cd blockchain && npx hardhat compile",
+    "blockchain:deploy:local": "cd blockchain && npx hardhat run scripts/deploy.js --network localhost",
+    "blockchain:deploy:amoy": "cd blockchain && npx hardhat run scripts/deploy.js --network amoy",
     "server:test": "cd server && npm test"
   },
   "devDependencies": {
