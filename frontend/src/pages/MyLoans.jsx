@@ -3,7 +3,7 @@ import { useWallet } from '../hooks/useWallet';
 import { useLoan } from '../hooks/useLoan';
 import { useCredit } from '../hooks/useCredit';
 import { api } from '../services/api';
-import { getContract } from '../services/blockchain';
+import { getContract, fetchUserLoansOnchain } from '../services/blockchain';
 import LoanTable from '../components/LoanTable';
 import TransactionProgress from '../components/TransactionProgress';
 import { RefreshCw, Filter, ShieldCheck } from 'lucide-react';
@@ -22,46 +22,28 @@ export default function MyLoans() {
     setLoading(true);
 
     try {
-      // 1. Try backend user loans endpoint
-      const res = await api.getUserLoans(account);
-      if (res && res.loans) {
-        setLoans(res.loans);
+      // 1. Direct onchain scan from LoanManager on Sepolia
+      const onchainLoans = await fetchUserLoansOnchain(account, provider);
+      if (onchainLoans && onchainLoans.length > 0) {
+        setLoans(onchainLoans);
         setLoading(false);
         return;
       }
-    } catch (err) {
-      console.warn('Backend query skipped, checking onchain loans directly:', err.message);
+    } catch (onchainErr) {
+      console.warn('Onchain direct scan error, checking fallback:', onchainErr.message);
     }
 
-    // 2. Fallback to direct onchain scan for user's loans
+    // 2. Fallback to backend API if available
     try {
-      const loanManager = getContract('loanManager', provider);
-      if (loanManager) {
-        const totalCount = await loanManager.loanCounter();
-        const userLoans = [];
-        for (let i = 1; i <= Number(totalCount); i++) {
-          const loan = await loanManager.getLoan(i);
-          if (
-            loan.borrower.toLowerCase() === account.toLowerCase() ||
-            (loan.lender && loan.lender.toLowerCase() === account.toLowerCase())
-          ) {
-            userLoans.push({
-              loanId: Number(loan.loanId),
-              borrower: loan.borrower,
-              lender: loan.lender,
-              principal: loan.principal,
-              interestRate: Number(loan.interestRate),
-              duration: Number(loan.duration),
-              status: Number(loan.status),
-              startTime: Number(loan.startTime),
-              dueDate: Number(loan.dueDate),
-            });
-          }
-        }
-        setLoans(userLoans);
+      const res = await api.getUserLoans(account);
+      if (res && res.loans) {
+        setLoans(res.loans);
+      } else {
+        setLoans([]);
       }
-    } catch (onchainErr) {
-      console.error('Failed to read onchain loans:', onchainErr);
+    } catch (err) {
+      console.warn('Backend query skipped:', err.message);
+      setLoans([]);
     } finally {
       setLoading(false);
     }

@@ -3,6 +3,7 @@ import { useWallet } from '../hooks/useWallet';
 import { useCredit } from '../hooks/useCredit';
 import { useLoan } from '../hooks/useLoan';
 import { api } from '../services/api';
+import { fetchUserLoansOnchain } from '../services/blockchain';
 import CreditScoreCard from '../components/CreditScoreCard';
 import BorrowingPowerCard from '../components/BorrowingPowerCard';
 import LoanTable from '../components/LoanTable';
@@ -12,7 +13,7 @@ import { Layers, CheckCircle2, AlertOctagon, TrendingUp, RefreshCw } from 'lucid
 import { Link } from 'react-router-dom';
 
 export default function Dashboard() {
-  const { account, isConnecting, connectWallet } = useWallet();
+  const { account, provider, isConnecting, connectWallet } = useWallet();
   const {
     score,
     limit,
@@ -31,10 +32,21 @@ export default function Dashboard() {
     if (!account) return;
     setLoansLoading(true);
     try {
+      // 1. Direct onchain scan from Sepolia
+      const onchain = await fetchUserLoansOnchain(account, provider);
+      if (onchain && onchain.length > 0) {
+        setLoans(onchain);
+        setLoansLoading(false);
+        return;
+      }
+    } catch (onchainErr) {
+      console.warn('Dashboard onchain loan fetch error:', onchainErr.message);
+    }
+
+    try {
       const data = await api.getUserLoans(account);
       setLoans(data.loans || []);
     } catch (err) {
-      // Backend may be offline during initial testing or before indexing
       console.warn('Could not fetch loans from backend API, using empty list:', err.message);
       setLoans([]);
     } finally {

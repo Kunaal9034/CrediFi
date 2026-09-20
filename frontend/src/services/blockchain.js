@@ -174,3 +174,82 @@ export function getExplorerAddressUrl(address) {
 export function getExplorerTxUrl(txHash) {
   return `${EXPLORER_URL}/tx/${txHash}`;
 }
+
+/**
+ * Normalizes onchain Loan struct into a consistent JS object
+ */
+export function normalizeLoan(loan) {
+  if (!loan) return null;
+  const loanId = Number(loan.loanId ?? 0);
+  const principal = typeof loan.principal === 'bigint' ? loan.principal : BigInt(loan.principal || 0);
+  const interestRateBps = Number(loan.interestRateBps ?? loan.interestRate ?? 0);
+  const duration = Number(loan.duration ?? 0);
+  const totalDue = typeof loan.totalDue === 'bigint' ? loan.totalDue : BigInt(loan.totalDue || 0);
+  const createdAt = Number(loan.createdAt ?? loan.startTime ?? 0);
+  const dueDate = Number(loan.dueDate ?? 0);
+  const status = Number(loan.status ?? 0);
+
+  return {
+    loanId,
+    borrower: loan.borrower,
+    lender: loan.lender,
+    principal,
+    interestRateBps,
+    interestRate: interestRateBps, // alias for backwards compatibility
+    duration,
+    totalDue,
+    createdAt,
+    startTime: createdAt, // alias for backwards compatibility
+    dueDate,
+    status,
+  };
+}
+
+/**
+ * Fetch full onchain details for a specific loan
+ */
+export async function fetchLoanDetails(loanId, runner) {
+  if (!loanId) return null;
+  try {
+    const loanManager = getContract('loanManager', runner);
+    if (!loanManager) return null;
+    const loan = await loanManager.getLoan(loanId);
+    return normalizeLoan(loan);
+  } catch (err) {
+    console.error(`[blockchain.js] Failed to fetch loan #${loanId}:`, err);
+    return null;
+  }
+}
+
+/**
+ * Scan onchain loans directly from LoanManager on Sepolia
+ */
+export async function fetchUserLoansOnchain(account, runner) {
+  if (!account) return [];
+  try {
+    const loanManager = getContract('loanManager', runner);
+    if (!loanManager) return [];
+    const count = await loanManager.loanCounter();
+    const totalCount = Number(count);
+    const userLoans = [];
+    const target = account.toLowerCase();
+
+    for (let i = 1; i <= totalCount; i++) {
+      try {
+        const loan = await loanManager.getLoan(i);
+        if (
+          (loan.borrower && loan.borrower.toLowerCase() === target) ||
+          (loan.lender && loan.lender.toLowerCase() === target)
+        ) {
+          userLoans.push(normalizeLoan(loan));
+        }
+      } catch (innerErr) {
+        console.warn(`[blockchain.js] Skipping loan #${i}:`, innerErr.message);
+      }
+    }
+    return userLoans.reverse();
+  } catch (err) {
+    console.error('[blockchain.js] Failed to fetch user loans onchain:', err);
+    return [];
+  }
+}

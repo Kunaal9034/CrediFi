@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useWallet } from '../hooks/useWallet';
 import { useLoan } from '../hooks/useLoan';
-import { getContract } from '../services/blockchain';
+import { getContract, fetchLoanDetails as fetchOnchainLoan } from '../services/blockchain';
 import { api } from '../services/api';
 import { formatAddress, formatUSDC, formatAPR, formatDurationDays, formatTimestamp } from '../utils/formatters';
 import LoanStatus from '../components/LoanStatus';
@@ -19,45 +19,36 @@ export default function LoanDetails() {
   const [totalDue, setTotalDue] = useState(0n);
   const [loading, setLoading] = useState(true);
 
-  const fetchLoanDetails = async () => {
+  const fetchDetails = async () => {
     setLoading(true);
     try {
-      // Direct onchain query via LoanManager
-      const loanManager = getContract('loanManager', provider);
-      if (loanManager) {
-        const onchainLoan = await loanManager.getLoan(id);
-        const due = await loanManager.calculateTotalDue(id);
-
-        setLoan({
-          loanId: Number(onchainLoan.loanId),
-          borrower: onchainLoan.borrower,
-          lender: onchainLoan.lender,
-          principal: onchainLoan.principal,
-          interestRate: Number(onchainLoan.interestRate),
-          duration: Number(onchainLoan.duration),
-          startTime: Number(onchainLoan.startTime),
-          dueDate: Number(onchainLoan.dueDate),
-          status: Number(onchainLoan.status),
-        });
-        setTotalDue(due);
+      // 1. Direct onchain query via LoanManager
+      const onchainLoan = await fetchOnchainLoan(id, provider);
+      if (onchainLoan) {
+        setLoan(onchainLoan);
+        setTotalDue(onchainLoan.totalDue);
+        setLoading(false);
+        return;
       }
     } catch (err) {
       console.warn('Onchain loan fetch failed, checking backend:', err.message);
-      try {
-        const res = await api.getLoanById(id);
-        if (res && res.loan) {
-          setLoan(res.loan);
-        }
-      } catch (apiErr) {
-        console.error('Failed to load loan details from both sources:', apiErr);
+    }
+
+    try {
+      const res = await api.getLoanById(id);
+      if (res && res.loan) {
+        setLoan(res.loan);
+        setTotalDue(res.loan.totalDue ? BigInt(res.loan.totalDue) : 0n);
       }
+    } catch (apiErr) {
+      console.error('Failed to load loan details from both sources:', apiErr);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchLoanDetails();
+    fetchDetails();
   }, [id, provider]);
 
   if (loading) {
