@@ -2,11 +2,20 @@ import React from 'react';
 import { ShieldCheck, TrendingUp, Info } from 'lucide-react';
 import { getCreditTier } from '../utils/constants';
 
-export default function CreditScoreCard({ score = 500, loading = false, initialLoading }) {
-  const showPlaceholder = initialLoading !== undefined ? initialLoading : loading;
-  const tier = getCreditTier(score);
+export default function CreditScoreCard({ score, loading = false, initialLoading, hasLoaded }) {
+  // CRITICAL UX RULE:
+  // If previous value exists (score is a valid number):
+  // NEVER render "---" just because loading=true.
+  // Only show the initial loading UI when there is no previously loaded value.
+  const hasValidScore = typeof score === 'number' && !isNaN(score);
+  const showPlaceholder = !hasValidScore;
+  const tier = hasValidScore
+    ? getCreditTier(score)
+    : { name: 'Loading...', color: 'text-slate-400', badge: 'bg-slate-800/80 text-slate-400 border-slate-700' };
   // Calculate percentage between 300 and 850
-  const percentage = Math.min(Math.max(((score - 300) / (850 - 300)) * 100, 0), 100);
+  const percentage = hasValidScore
+    ? Math.min(Math.max(((score - 300) / (850 - 300)) * 100, 0), 100)
+    : 0;
 
   return (
     <div className="p-6 rounded-2xl glass-panel-glow relative overflow-hidden">

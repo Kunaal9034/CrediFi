@@ -376,7 +376,7 @@ export default function Borrow() {
               </h3>
             </div>
             <div className="text-3xl font-black text-white font-mono mb-1">
-              {creditLoading ? '---' : score}
+              {typeof score === 'number' && !isNaN(score) ? score : '---'}
             </div>
             <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${tier.badge} mb-4`}>
               {tier.name}

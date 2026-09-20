@@ -3,46 +3,73 @@ import { useWallet } from './useWallet';
 import { fetchOnchainCreditProfile } from '../services/blockchain';
 import { getCreditTier } from '../utils/constants';
 
-const DEFAULT_CREDIT_DATA = {
-  score: 500,
-  limit: 500n * 10n ** 6n,
-  availableBorrowingPower: 500n * 10n ** 6n,
-  outstandingPrincipal: 0n,
+// Address-keyed persistent memory cache: lowercaseAddress -> creditData
+const creditProfileCache = new Map();
+
+const EMPTY_CREDIT_DATA = {
+  score: null,
+  limit: null,
+  availableBorrowingPower: null,
+  outstandingPrincipal: null,
   profile: null,
 };
 
 export function useCredit(targetAddress) {
-  const { account, provider, chainId } = useWallet();
+  const { account, provider } = useWallet();
   const addressToQuery = targetAddress || account;
+  const addressKey = addressToQuery ? addressToQuery.toLowerCase() : null;
 
-  const [creditData, setCreditData] = useState(DEFAULT_CREDIT_DATA);
-  const [hasLoaded, setHasLoaded] = useState(false);
+  // Initialize from cache if already loaded for this address, else null state
+  const cachedData = addressKey ? creditProfileCache.get(addressKey) : null;
+  const [creditData, setCreditData] = useState(cachedData || EMPTY_CREDIT_DATA);
+  const [hasLoaded, setHasLoaded] = useState(Boolean(cachedData));
   const [isFetching, setIsFetching] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
-  const lastLoadedKeyRef = useRef(null);
   const fetchCountRef = useRef(0);
+  const activeAddressRef = useRef(addressKey);
 
-  const fetchCredit = useCallback(async () => {
-    if (!addressToQuery) {
-      setCreditData(DEFAULT_CREDIT_DATA);
+  // Sync state if address changed or cache updated
+  useEffect(() => {
+    activeAddressRef.current = addressKey;
+    if (!addressKey) {
+      setCreditData(EMPTY_CREDIT_DATA);
       setHasLoaded(false);
       setIsFetching(false);
       setIsRefreshing(false);
       setError(null);
-      lastLoadedKeyRef.current = null;
       return;
     }
 
-    const currentKey = `${addressToQuery.toLowerCase()}-${chainId || ''}`;
-    const isAlreadyLoaded = lastLoadedKeyRef.current === currentKey;
+    const currentCached = creditProfileCache.get(addressKey);
+    if (currentCached) {
+      setCreditData(currentCached);
+      setHasLoaded(true);
+    } else {
+      setCreditData(EMPTY_CREDIT_DATA);
+      setHasLoaded(false);
+    }
+  }, [addressKey]);
 
-    if (isAlreadyLoaded) {
-      // Background refresh: preserve loaded numbers, do not show initial placeholders
+  const fetchCredit = useCallback(async () => {
+    if (!addressToQuery) {
+      setCreditData(EMPTY_CREDIT_DATA);
+      setHasLoaded(false);
+      setIsFetching(false);
+      setIsRefreshing(false);
+      setError(null);
+      return;
+    }
+
+    const currentKey = addressToQuery.toLowerCase();
+    const alreadyHasData = creditProfileCache.has(currentKey) || (activeAddressRef.current === currentKey && hasLoaded);
+
+    if (alreadyHasData) {
+      // Background refresh: preserve existing valid data, do not show initial skeleton
       setIsRefreshing(true);
     } else {
-      // First-time load for this address/network: show initial loading state
+      // First-time load for this address: show initial skeleton
       setIsFetching(true);
       setHasLoaded(false);
     }
@@ -53,31 +80,36 @@ export function useCredit(targetAddress) {
     try {
       const data = await fetchOnchainCreditProfile(addressToQuery, provider);
       if (fetchCountRef.current !== requestId) return;
+      if (activeAddressRef.current !== currentKey) return;
 
-      // Update state atomically without intermediate placeholders
+      creditProfileCache.set(currentKey, data);
       setCreditData(data);
       setHasLoaded(true);
-      lastLoadedKeyRef.current = currentKey;
       setError(null);
     } catch (err) {
       if (fetchCountRef.current !== requestId) return;
+      if (activeAddressRef.current !== currentKey) return;
       console.error('[useCredit] Error fetching onchain credit profile:', err);
       setError(err.message || 'Failed to load credit profile from Sepolia');
-      // Note: If data was already loaded, existing creditData is maintained
+      // CRITICAL UX RULE:
+      // If valid data already exists in creditData or cache, preserve it.
+      // Do NOT overwrite creditData with default/empty state on error.
     } finally {
       if (fetchCountRef.current === requestId) {
         setIsFetching(false);
         setIsRefreshing(false);
       }
     }
-  }, [addressToQuery, chainId, provider]);
+  }, [addressToQuery, hasLoaded, provider]);
 
   useEffect(() => {
     fetchCredit();
   }, [fetchCredit]);
 
   const initialLoading = !hasLoaded && isFetching;
-  const tier = getCreditTier(creditData.score);
+  const tier = typeof creditData.score === 'number' && !isNaN(creditData.score)
+    ? getCreditTier(creditData.score)
+    : { name: 'Loading...', color: 'text-slate-400', badge: 'bg-slate-800/80 text-slate-400 border-slate-700' };
 
   return {
     score: creditData.score,
@@ -90,7 +122,7 @@ export function useCredit(targetAddress) {
     initialLoading,
     isRefreshing,
     isFetching: isFetching || isRefreshing,
-    // loading is true ONLY when data has never been loaded for the active account/network
+    // loading is true ONLY when data has never been loaded for the active account
     loading: initialLoading,
     error,
     refresh: fetchCredit,

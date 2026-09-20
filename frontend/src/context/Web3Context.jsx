@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { ethers } from 'ethers';
 import { CHAIN_ID, CONTRACT_ADDRESSES } from '../contracts/addresses';
 import {
@@ -183,27 +183,44 @@ export function Web3Provider({ children }) {
     };
   }, [disconnectWallet, refreshBalances]);
 
+  const contextValue = useMemo(
+    () => ({
+      account,
+      provider,
+      signer,
+      chainId,
+      targetChainId: CHAIN_ID,
+      isCorrectNetwork,
+      isConnecting,
+      connectionError,
+      clearConnectionError: () => setConnectionError(null),
+      tokenBalance,
+      ethBalance,
+      contracts: CONTRACT_ADDRESSES,
+      connectWallet,
+      disconnectWallet,
+      switchNetwork: handleSwitchNetwork,
+      refreshBalances: () => refreshBalances(account, signer),
+    }),
+    [
+      account,
+      provider,
+      signer,
+      chainId,
+      isCorrectNetwork,
+      isConnecting,
+      connectionError,
+      tokenBalance,
+      ethBalance,
+      connectWallet,
+      disconnectWallet,
+      handleSwitchNetwork,
+      refreshBalances,
+    ]
+  );
+
   return (
-    <Web3Context.Provider
-      value={{
-        account,
-        provider,
-        signer,
-        chainId,
-        targetChainId: CHAIN_ID,
-        isCorrectNetwork,
-        isConnecting,
-        connectionError,
-        clearConnectionError: () => setConnectionError(null),
-        tokenBalance,
-        ethBalance,
-        contracts: CONTRACT_ADDRESSES,
-        connectWallet,
-        disconnectWallet,
-        switchNetwork: handleSwitchNetwork,
-        refreshBalances: () => refreshBalances(account, signer),
-      }}
-    >
+    <Web3Context.Provider value={contextValue}>
       {children}
     </Web3Context.Provider>
   );

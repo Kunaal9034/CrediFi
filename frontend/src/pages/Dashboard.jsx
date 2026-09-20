@@ -23,6 +23,7 @@ export default function Dashboard() {
     loading: creditLoading,
     isRefreshing: creditRefreshing,
     initialLoading,
+    hasLoaded,
     refresh: refreshCredit,
   } = useCredit();
   const { fundLoan, repayLoan, status, txHash, error, reset, isPending } = useLoan();
@@ -123,13 +124,19 @@ export default function Dashboard() {
 
       {/* Primary Cards Grid: Score + Borrowing Power */}
       <div className="grid md:grid-cols-2 gap-6 mb-8">
-        <CreditScoreCard score={score} loading={creditLoading} initialLoading={initialLoading} />
+        <CreditScoreCard
+          score={score}
+          loading={creditLoading}
+          initialLoading={initialLoading}
+          hasLoaded={hasLoaded}
+        />
         <BorrowingPowerCard
           limit={limit}
           availableBorrowingPower={availableBorrowingPower}
           outstandingPrincipal={outstandingPrincipal}
           loading={creditLoading}
           initialLoading={initialLoading}
+          hasLoaded={hasLoaded}
         />
       </div>
 

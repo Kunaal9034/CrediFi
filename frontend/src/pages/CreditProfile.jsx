@@ -16,6 +16,7 @@ export default function CreditProfile() {
     profile,
     loading,
     initialLoading,
+    hasLoaded,
   } = useCredit();
 
   if (!account) {
@@ -53,13 +54,19 @@ export default function CreditProfile() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-6 mb-10">
-        <CreditScoreCard score={score} loading={loading} initialLoading={initialLoading} />
+        <CreditScoreCard
+          score={score}
+          loading={loading}
+          initialLoading={initialLoading}
+          hasLoaded={hasLoaded}
+        />
         <BorrowingPowerCard
           limit={limit}
           availableBorrowingPower={availableBorrowingPower}
           outstandingPrincipal={outstandingPrincipal}
           loading={loading}
           initialLoading={initialLoading}
+          hasLoaded={hasLoaded}
         />
       </div>
 

@@ -4,20 +4,30 @@ import { Link } from 'react-router-dom';
 import { formatUSDC } from '../utils/formatters';
 
 export default function BorrowingPowerCard({
-  limit = 0n,
+  limit,
   availableBorrowingPower,
-  outstandingPrincipal = 0n,
+  outstandingPrincipal,
   loading = false,
   initialLoading,
+  hasLoaded,
 }) {
-  const showPlaceholder = initialLoading !== undefined ? initialLoading : loading;
+  const hasValidLimit = limit !== undefined && limit !== null;
+  const hasValidAvailable = availableBorrowingPower !== undefined && availableBorrowingPower !== null;
+  const hasValidData = hasValidLimit || hasValidAvailable;
 
-  // If availableBorrowingPower is not explicitly passed, fallback to limit
-  const available = availableBorrowingPower !== undefined ? availableBorrowingPower : limit;
+  // CRITICAL UX RULE:
+  // If previous value exists (hasValidData is true):
+  // NEVER render "---" just because loading=true.
+  // Only show the initial loading UI when there is no previously loaded value.
+  const showPlaceholder = !hasValidData;
+
+  const available = hasValidAvailable ? availableBorrowingPower : (hasValidLimit ? limit : 0n);
+  const resolvedLimit = hasValidLimit ? limit : 0n;
+  const resolvedOutstanding = (outstandingPrincipal !== undefined && outstandingPrincipal !== null) ? outstandingPrincipal : 0n;
 
   // Calculate percentage of borrowing power used
-  const limitNum = Number(limit) / 1e6;
-  const outstandingNum = Number(outstandingPrincipal) / 1e6;
+  const limitNum = Number(resolvedLimit) / 1e6;
+  const outstandingNum = Number(resolvedOutstanding) / 1e6;
   const usedPercent = limitNum > 0 ? Math.min(Math.round((outstandingNum / limitNum) * 100), 100) : 0;
 
   return (
@@ -60,13 +70,13 @@ export default function BorrowingPowerCard({
           <div>
             <span className="text-slate-400 block text-[11px]">Total Credit Limit</span>
             <span className="font-semibold text-slate-200">
-              ${showPlaceholder ? '---' : formatUSDC(limit)}
+              ${showPlaceholder ? '---' : formatUSDC(resolvedLimit)}
             </span>
           </div>
           <div className="text-right">
             <span className="text-slate-400 block text-[11px]">Current Exposure</span>
             <span className="font-semibold text-rose-400">
-              ${showPlaceholder ? '---' : formatUSDC(outstandingPrincipal)}
+              ${showPlaceholder ? '---' : formatUSDC(resolvedOutstanding)}
             </span>
           </div>
         </div>

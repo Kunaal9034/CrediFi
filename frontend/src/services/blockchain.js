@@ -75,9 +75,9 @@ export async function fetchOnchainCreditProfile(account, runner) {
 
   if (!account) return defaultState;
 
-  try {
-    const registry = getContract('creditRegistry', runner);
-    const loanManager = getContract('loanManager', runner);
+  const executeQuery = async (activeRunner) => {
+    const registry = getContract('creditRegistry', activeRunner);
+    const loanManager = getContract('loanManager', activeRunner);
 
     if (!registry) return defaultState;
 
@@ -113,9 +113,21 @@ export async function fetchOnchainCreditProfile(account, runner) {
         initialized: Boolean(profile.initialized),
       },
     };
-  } catch (err) {
-    console.error('[blockchain.js] Failed to fetch onchain credit profile:', err);
-    throw err;
+  };
+
+  try {
+    return await executeQuery(runner);
+  } catch (primaryErr) {
+    if (runner) {
+      try {
+        return await executeQuery(getFallbackProvider());
+      } catch (fallbackErr) {
+        console.error('[blockchain.js] Both primary and fallback RPC failed:', fallbackErr);
+        throw fallbackErr;
+      }
+    }
+    console.error('[blockchain.js] Failed to fetch onchain credit profile:', primaryErr);
+    throw primaryErr;
   }
 }
 
