@@ -29,6 +29,11 @@ LoanManager (Protocol Orchestrator)
      - Early repayment bonus: `+20`
      - Late repayment penalty: `-40`
      - Default penalty: `-150`
+   - Borrowing Limit Formula (Deterministic, 6 decimals):
+     $$ \text{borrowingLimit} = \frac{\text{BASE\_LIMIT} \times \text{creditScore}}{\text{BASE\_SCORE}} $$
+     - `BASE_SCORE` = 500, `BASE_LIMIT` = $500 \times 10^6$ units ($500.00$ MockUSDC)
+     - `MIN_LIMIT` = $100 \times 10^6$ units, `MAX_LIMIT` = $1,500 \times 10^6$ units
+     - If `creditScore < 350`, `borrowingLimit = 0` (delinquent borrower cutoff).
    - Access Control: Mutations restricted strictly to `onlyLoanManager`:
      - `recordLoan(address borrower, uint256 amount) external onlyLoanManager`
      - `recordRepayment(address borrower, uint256 amount, bool onTime, bool early) external onlyLoanManager`
@@ -40,16 +45,22 @@ LoanManager (Protocol Orchestrator)
 
 3. **`LoanManager.sol`**:
    - Protocol orchestrator. Determines and validates all loan states.
-   - **Enforces Undercollateralized Borrowing Limit Onchain:**
+   - **Enforces Undercollateralized / Unsecured Borrowing Limit Onchain:**
      ```solidity
      uint256 limit = creditRegistry.getBorrowingLimit(msg.sender);
      require(amount <= limit, "LoanManager: Requested amount exceeds onchain borrowing limit");
      ```
-   - Lifecycle functions:
-     - `createLoan(uint256 amount, uint256 duration, uint256 interestRate)`: Validates amount <= borrowing limit; emits `LoanCreated`.
-     - `fundLoan(uint256 loanId)`: Transitions `REQUESTED -> ACTIVE`; triggers `LendingPool.transferFunds()`; emits `LoanFunded`.
-     - `repayLoan(uint256 loanId)`: Transitions `ACTIVE -> REPAID`; triggers `LendingPool.executeRepayment()`; updates credit via `CreditRegistry.recordRepayment()`; emits `LoanRepaid`.
-     - `markDefault(uint256 loanId)`: Transitions `ACTIVE -> DEFAULTED`; updates credit via `CreditRegistry.recordDefault()`; emits `LoanDefaulted`.
+   - **Exact Interest Formula (Basis Points):**
+     ```solidity
+     function calculateInterest(uint256 principal, uint256 rateBps, uint256 duration) public pure returns (uint256) {
+         return (principal * rateBps * duration) / (365 days * 10000);
+     }
+     ```
+   - Lifecycle functions & Credit Event Timing:
+     - `createLoan(uint256 amount, uint256 duration, uint256 interestRate)`: Validates amount <= borrowing limit; creates loan with status = `REQUESTED`; emits `LoanCreated`. (`CreditRegistry.recordLoan()` is **NOT** called here).
+     - `fundLoan(uint256 loanId)`: Transitions `REQUESTED -> ACTIVE`; triggers `LendingPool.transferFunds()`; calls `CreditRegistry.recordLoan(borrower, amount)` **after successful token transfer**; emits `LoanFunded`.
+     - `repayLoan(uint256 loanId)`: Transitions `ACTIVE -> REPAID`; triggers `LendingPool.executeRepayment()`; updates credit via `CreditRegistry.recordRepayment()`; emits `LoanRepaid` & `CreditProfileUpdated`.
+     - `markDefault(uint256 loanId)`: Transitions `ACTIVE -> DEFAULTED` if `block.timestamp > dueDate`; updates credit via `CreditRegistry.recordDefault()`; emits `LoanDefaulted` & `CreditProfileUpdated`.
 
 4. **`LendingPool.sol`**:
    - Handles actual token movement.
@@ -58,6 +69,10 @@ LoanManager (Protocol Orchestrator)
      - `transferFunds(address lender, address borrower, uint256 amount)`
      - `executeRepayment(address borrower, address lender, uint256 totalDue)`
    - Does **not** independently determine loan lifecycle state.
+
+5. **Financial Mechanism Classification:**
+   - **Model A: Credit-Based Unsecured Lending (Zero Collateral)**.
+   - Borrowing capacity is governed by onchain reputation. No collateral token is locked, deposited, or liquidated.
 
 ---
 
