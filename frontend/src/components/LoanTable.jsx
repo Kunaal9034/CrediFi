@@ -8,6 +8,7 @@ export default function LoanTable({
   currentAccount,
   onFund,
   onRepay,
+  onDefault,
   isProcessing = false,
   emptyMessage = 'No loans found.',
 }) {
@@ -18,6 +19,9 @@ export default function LoanTable({
       </div>
     );
   }
+
+  const now = Math.floor(Date.now() / 1000);
+  const GRACE_PERIOD = 86400; // 1 day
 
   return (
     <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/40">
@@ -38,6 +42,10 @@ export default function LoanTable({
             const isBorrower =
               currentAccount &&
               loan.borrower.toLowerCase() === currentAccount.toLowerCase();
+
+            const dueDate = Number(loan.dueDate || 0);
+            const isPastGrace =
+              Number(loan.status) === 1 && dueDate > 0 && now > dueDate + GRACE_PERIOD;
 
             return (
               <tr key={loan.loanId.toString()} className="hover:bg-slate-800/30 transition-colors">
@@ -60,7 +68,14 @@ export default function LoanTable({
                 <td className="py-3.5 px-4 text-slate-300">{formatAPR(loan.interestRate)}</td>
                 <td className="py-3.5 px-4 text-slate-300">{formatDurationDays(loan.duration)}</td>
                 <td className="py-3.5 px-4">
-                  <LoanStatus status={Number(loan.status)} />
+                  <div className="flex flex-col space-y-1">
+                    <LoanStatus status={Number(loan.status)} />
+                    {isPastGrace && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30 w-fit">
+                        Overdue (Grace Expired)
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="py-3.5 px-4 text-right space-x-2">
                   <Link
@@ -84,9 +99,24 @@ export default function LoanTable({
                     <button
                       onClick={() => onRepay(loan.loanId, loan)}
                       disabled={isProcessing}
-                      className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition-all disabled:opacity-50"
+                      className={`px-3 py-1 rounded-lg font-medium transition-all disabled:opacity-50 ${
+                        isPastGrace
+                          ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                          : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                      }`}
                     >
-                      Repay
+                      {isPastGrace ? 'Repay (Late)' : 'Repay'}
+                    </button>
+                  )}
+
+                  {isPastGrace && onDefault && (
+                    <button
+                      onClick={() => onDefault(loan.loanId, loan)}
+                      disabled={isProcessing}
+                      className="px-3 py-1 rounded-lg bg-rose-600/80 hover:bg-rose-500 text-white font-medium transition-all disabled:opacity-50"
+                      title="Mark overdue loan as defaulted"
+                    >
+                      Default
                     </button>
                   )}
                 </td>

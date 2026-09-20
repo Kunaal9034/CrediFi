@@ -76,12 +76,14 @@ export function useLoan() {
 
   const [fundedLoan, setFundedLoan] = useState(null);
   const [repaidLoan, setRepaidLoan] = useState(null);
+  const [defaultedLoan, setDefaultedLoan] = useState(null);
 
   const resetAll = () => {
     tx.reset();
     setCreatedLoan(null);
     setFundedLoan(null);
     setRepaidLoan(null);
+    setDefaultedLoan(null);
   };
 
   // 2. Approve LendingPool to spend MockUSDC
@@ -311,6 +313,8 @@ export function useLoan() {
       totalDue: extractedTotalDue || onchainLoan.totalDue,
       interest: (extractedTotalDue || onchainLoan.totalDue) - (extractedPrincipal || onchainLoan.principal),
       repType: extractedRepType,
+      isLate: extractedRepType === 2,
+      isEarly: extractedRepType === 0,
       scoreBefore: Number(scoreBefore),
       scoreAfter: Number(scoreAfter),
       limitBefore,
@@ -325,7 +329,91 @@ export function useLoan() {
     return { receipt, repaidLoan: repaidInfo };
   };
 
-  // 5. Claim Demo Faucet Tokens
+  // 5. Mark Default (Permissionless liquidator trigger after grace period)
+  const markDefault = async (loanId, onStateRefresh) => {
+    if (!account) throw new Error('Please connect your MetaMask wallet');
+    if (!signer) throw new Error('Signer not available. Please unlock MetaMask');
+    if (!isCorrectNetwork) throw new Error('Please switch to Ethereum Sepolia (Chain ID 11155111)');
+
+    const loanManager = getContract('loanManager', signer);
+    const creditRegistry = getContract('creditRegistry', signer);
+
+    if (!loanManager || !creditRegistry) throw new Error('Contracts not initialized');
+
+    // Fresh onchain check of loan state
+    const onchainLoan = await loanManager.getLoan(loanId);
+    if (!onchainLoan || onchainLoan.loanId === 0n) {
+      throw new Error('Loan does not exist onchain');
+    }
+    if (Number(onchainLoan.status) !== 1) {
+      throw new Error('This loan is not active or has already been resolved');
+    }
+
+    // Check block timestamp against dueDate + 1 day grace period
+    const currentBlock = await signer.provider.getBlock('latest');
+    const GRACE_PERIOD = 86400n;
+    if (BigInt(currentBlock.timestamp) <= onchainLoan.dueDate + GRACE_PERIOD) {
+      throw new Error('Loan is not past due date plus 1-day grace period');
+    }
+
+    // Capture pre-default metrics
+    let scoreBefore = 500;
+    let limitBefore = 0n;
+    let outstandingBefore = 0n;
+    try {
+      scoreBefore = await creditRegistry.getCreditScore(onchainLoan.borrower);
+      limitBefore = await creditRegistry.getBorrowingLimit(onchainLoan.borrower);
+      outstandingBefore = await loanManager.getOutstandingPrincipal(onchainLoan.borrower);
+    } catch (err) {
+      console.warn('[useLoan] Could not read pre-default metrics:', err);
+    }
+
+    setDefaultedLoan(null);
+
+    const receipt = await tx.executeTransaction(
+      async () => {
+        return await loanManager.markDefault(loanId);
+      },
+      async () => {
+        await refreshBalances();
+        if (onStateRefresh) await onStateRefresh();
+      }
+    );
+
+    let updatedLoan = null;
+    let scoreAfter = scoreBefore;
+    let limitAfter = limitBefore;
+    let outstandingAfter = outstandingBefore;
+
+    try {
+      updatedLoan = await fetchLoanDetails(loanId, signer);
+      scoreAfter = await creditRegistry.getCreditScore(onchainLoan.borrower);
+      limitAfter = await creditRegistry.getBorrowingLimit(onchainLoan.borrower);
+      outstandingAfter = await loanManager.getOutstandingPrincipal(onchainLoan.borrower);
+    } catch (e) {
+      console.warn('[useLoan] Failed to fetch updated defaulted loan details:', e);
+    }
+
+    const defaultedInfo = {
+      loanId: Number(loanId),
+      txHash: receipt ? receipt.hash : null,
+      borrower: onchainLoan.borrower,
+      lender: onchainLoan.lender,
+      principal: onchainLoan.principal,
+      scoreBefore: Number(scoreBefore),
+      scoreAfter: Number(scoreAfter),
+      limitBefore,
+      limitAfter,
+      outstandingBefore,
+      outstandingAfter,
+      loan: updatedLoan,
+    };
+
+    setDefaultedLoan(defaultedInfo);
+    return { receipt, defaultedLoan: defaultedInfo };
+  };
+
+  // 6. Claim Demo Faucet Tokens
   const claimFaucet = async (amountRaw = 1000n * 10n ** 6n) => {
     if (!signer) throw new Error('Please connect your MetaMask wallet');
     const mockUSDC = getContract('mockUSDC', signer);
@@ -344,11 +432,13 @@ export function useLoan() {
     createdLoan,
     fundedLoan,
     repaidLoan,
+    defaultedLoan,
     reset: resetAll,
     requestLoan,
     approveLendingPool,
     fundLoan,
     repayLoan,
+    markDefault,
     claimFaucet,
   };
 }

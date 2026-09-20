@@ -30,6 +30,7 @@ import {
   CheckCircle2,
   Sparkles,
   ArrowRight,
+  AlertCircle,
 } from 'lucide-react';
 
 export default function LoanDetails() {
@@ -38,8 +39,10 @@ export default function LoanDetails() {
   const {
     fundLoan,
     repayLoan,
+    markDefault,
     approveLendingPool,
     repaidLoan,
+    defaultedLoan,
     status,
     txHash,
     error,
@@ -152,6 +155,12 @@ export default function LoanDetails() {
   const needsApproval = allowance < requiredAmount;
   const hasInsufficientBalance = tokenBalance < requiredAmount;
 
+  const now = Math.floor(Date.now() / 1000);
+  const gracePeriod = 86400; // 1 day in seconds
+  const graceDeadline = loan && loan.dueDate > 0 ? Number(loan.dueDate) + gracePeriod : 0;
+  const isOverdue =
+    loan && Number(loan.status) === 1 && graceDeadline > 0 && now > graceDeadline;
+
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
       <Link
@@ -188,15 +197,36 @@ export default function LoanDetails() {
           }}
         />
 
+        {/* Overdue / Grace Period Expired Alert Banner */}
+        {isOverdue && Number(loan.status) === 1 && !repaidLoan && !defaultedLoan && (
+          <div className="p-4 rounded-2xl bg-amber-950/40 border border-amber-800/60 text-xs text-amber-300 space-y-2 animate-in fade-in">
+            <div className="flex items-center space-x-2 text-amber-400 font-bold text-sm">
+              <AlertCircle size={16} />
+              <span>Overdue: Grace Period Expired</span>
+            </div>
+            <p className="text-[11px] text-slate-300 leading-relaxed">
+              This loan passed its due date plus the 1-day grace period ({formatTimestamp(graceDeadline)}).
+              The borrower can settle late (<strong>-40 point late credit penalty</strong>, floor 300).
+              Alternatively, any account can trigger protocol default (<strong>-150 point credit penalty</strong>, zero token movement).
+            </p>
+          </div>
+        )}
+
         {/* Repayment Success Celebration Receipt */}
         {repaidLoan && (
           <div className="p-5 rounded-2xl bg-gradient-to-r from-emerald-950/60 to-cyan-950/40 border border-emerald-800/60 space-y-3 animate-in zoom-in-95 duration-200">
             <div className="flex items-center space-x-2 text-emerald-400">
               <CheckCircle2 size={20} />
-              <h3 className="font-bold text-white text-base">Loan Settle Confirmed!</h3>
+              <h3 className="font-bold text-white text-base">
+                {repaidLoan.isLate || repaidLoan.scoreDelta < 0
+                  ? 'Loan Repaid (Late Settlement Confirmed)!'
+                  : 'Loan Settle Confirmed!'}
+              </h3>
             </div>
             <p className="text-xs text-emerald-300">
-              Debt successfully settled on Ethereum Sepolia. Your onchain credit profile has been updated:
+              {repaidLoan.isLate || repaidLoan.scoreDelta < 0
+                ? 'Debt settled after grace period on Ethereum Sepolia. Late penalty applied per protocol rules:'
+                : 'Debt successfully settled on Ethereum Sepolia. Your onchain credit profile has been updated:'}
             </p>
 
             <div className="flex items-baseline space-x-3 pt-2">
@@ -204,11 +234,17 @@ export default function LoanDetails() {
                 {repaidLoan.scoreBefore}
               </span>
               <ArrowRight size={16} className="text-cyan-400" />
-              <span className="text-2xl font-extrabold font-mono text-cyan-300">
+              <span className={`text-2xl font-extrabold font-mono ${
+                repaidLoan.scoreDelta < 0 ? 'text-rose-400' : 'text-cyan-300'
+              }`}>
                 {repaidLoan.scoreAfter}
               </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                +{repaidLoan.scoreAfter - repaidLoan.scoreBefore} Points
+              <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                repaidLoan.scoreDelta < 0
+                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                  : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+              }`}>
+                {repaidLoan.scoreDelta > 0 ? `+${repaidLoan.scoreDelta}` : `${repaidLoan.scoreDelta}`} Points
               </span>
             </div>
 
@@ -218,6 +254,67 @@ export default function LoanDetails() {
                 ${formatUSDC(repaidLoan.limitAfter)} USDC
               </span>
             </div>
+            <div className="flex justify-between text-slate-400 text-xs pt-1">
+              <span>Outstanding Debt:</span>
+              <span className="font-mono text-emerald-400 font-bold">
+                ${formatUSDC(repaidLoan.outstandingAfter)} USDC
+              </span>
+            </div>
+            {repaidLoan.txHash && (
+              <div className="pt-2 border-t border-emerald-800/40 text-xs flex justify-between">
+                <span className="text-slate-400">Transaction:</span>
+                <ExplorerLink hash={repaidLoan.txHash} type="tx" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Defaulted Loan Receipt */}
+        {defaultedLoan && (
+          <div className="p-5 rounded-2xl bg-gradient-to-r from-rose-950/70 to-slate-900/80 border border-rose-800/60 space-y-3 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center space-x-2 text-rose-400">
+              <AlertCircle size={20} />
+              <h3 className="font-bold text-white text-base">Loan Marked as DEFAULTED!</h3>
+            </div>
+            <p className="text-xs text-rose-300">
+              This loan has transitioned from ACTIVE to DEFAULTED on Ethereum Sepolia.
+            </p>
+
+            <div className="flex items-baseline space-x-3 pt-2">
+              <span className="text-xl font-extrabold font-mono text-slate-400 line-through">
+                {defaultedLoan.scoreBefore}
+              </span>
+              <ArrowRight size={16} className="text-rose-400" />
+              <span className="text-2xl font-extrabold font-mono text-rose-400">
+                {defaultedLoan.scoreAfter}
+              </span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                {defaultedLoan.scoreDelta} Points (Default Penalty)
+              </span>
+            </div>
+
+            <div className="pt-2 border-t border-rose-800/40 text-xs flex justify-between">
+              <span className="text-slate-300">New Borrowing Limit:</span>
+              <span className="font-mono text-white font-bold">
+                ${formatUSDC(defaultedLoan.limitAfter)} USDC
+              </span>
+            </div>
+            <div className="flex justify-between text-slate-400 text-xs pt-1">
+              <span>Outstanding Debt:</span>
+              <span className="font-mono text-emerald-400 font-bold">
+                ${formatUSDC(defaultedLoan.outstandingAfter)} USDC
+              </span>
+            </div>
+            <div className="flex justify-between text-slate-400 text-xs pt-1">
+              <span>Tokens Moved:</span>
+              <span className="font-mono text-slate-200 font-bold">0 mUSDC (No Token Movement)</span>
+            </div>
+            {defaultedLoan.txHash && (
+              <div className="pt-2 border-t border-rose-800/40 text-xs flex justify-between">
+                <span className="text-slate-400">Transaction:</span>
+                <ExplorerLink hash={defaultedLoan.txHash} type="tx" />
+              </div>
+            )}
           </div>
         )}
 
@@ -295,8 +392,16 @@ export default function LoanDetails() {
           </button>
         )}
 
-        {Number(loan.status) === 1 && isBorrower && !repaidLoan && (
+        {Number(loan.status) === 1 && isBorrower && !repaidLoan && !defaultedLoan && (
           <div className="space-y-2 pt-2">
+            {isOverdue && (
+              <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-800/60 text-xs text-amber-300 flex items-start space-x-2">
+                <AlertCircle size={15} className="text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                  Notice: Loan is overdue. Settling late will apply a <strong>-40 point late penalty</strong> to your onchain credit score (floor 300).
+                </p>
+              </div>
+            )}
             {needsApproval ? (
               <button
                 type="button"
@@ -317,9 +422,37 @@ export default function LoanDetails() {
               >
                 {isPending
                   ? 'Settling Loan on Sepolia...'
+                  : isOverdue
+                  ? `2. Repay Total Due (Late: -40 Score Impact) ($${formatUSDC(requiredAmount)} mUSDC)`
                   : `2. Repay Total Due ($${formatUSDC(requiredAmount)} mUSDC)`}
               </button>
             )}
+          </div>
+        )}
+
+        {/* Protocol Default Trigger Button (Permissionless, available when overdue and ACTIVE) */}
+        {Number(loan.status) === 1 && isOverdue && !repaidLoan && !defaultedLoan && (
+          <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 text-xs space-y-3 pt-2">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 font-semibold">Protocol Default Action:</span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                Permissionless Call
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Grace period has expired. Anyone may trigger default to release protocol exposure and apply the -150 borrower penalty. No token transfer occurs.
+            </p>
+            <button
+              type="button"
+              onClick={() => markDefault(loan.loanId, async () => {
+                await refreshCredit();
+                await fetchDetails();
+              })}
+              disabled={isPending || !isCorrectNetwork}
+              className="w-full py-3.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs transition-all disabled:opacity-50 shadow-lg shadow-rose-600/20"
+            >
+              {isPending ? 'Marking Default on Sepolia...' : 'Mark Loan as DEFAULTED (-150 Penalty)'}
+            </button>
           </div>
         )}
       </div>
