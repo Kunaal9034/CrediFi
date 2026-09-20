@@ -1,0 +1,34 @@
+{
+  "name": "credifi-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ArcTech presents CrediFi - Onchain Credit & Undercollateralized Lending (Hack in Hills '26)",
+  "workspaces": [
+    "contracts",
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "compile:contracts": "npm --prefix contracts run compile",
+    "test:contracts": "npm --prefix contracts run test",
+    "deploy:sepolia": "npm --prefix contracts run deploy:sepolia",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build:frontend": "npm --prefix frontend run build",
+    "preview:frontend": "npm --prefix frontend run preview",
+    "dev:backend": "npm --prefix backend run dev",
+    "start:backend": "npm --prefix backend run start",
+    "test:backend": "npm --prefix backend run test",
+    "test:all": "npm run test:contracts && npm run test:backend"
+  },
+  "keywords": [
+    "web3",
+    "defi",
+    "undercollateralized-lending",
+    "credit-scoring",
+    "ethereum",
+    "sepolia",
+    "hackathon"
+  ],
+  "author": "ArcTech",
+  "license": "MIT"
+}

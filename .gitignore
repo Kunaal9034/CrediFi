@@ -1,0 +1,35 @@
+# Node dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment and Secrets (NEVER COMMIT SENSITIVE SECRETS)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Hardhat & Solidity
+cache/
+artifacts/
+typechain/
+typechain-types/
+
+# Vite & Frontend build
+dist/
+dist-ssr/
+*.local
+
+# Logs and databases
+logs
+*.log
+*.sqlite
+
+# OS and Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

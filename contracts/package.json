@@ -1,0 +1,23 @@
+{
+  "name": "credifi-contracts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Smart contracts for CrediFi - Onchain Credit & Undercollateralized Lending",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia",
+    "deploy:local": "hardhat run scripts/deploy.js --network localhost"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.2",
+    "credifi-monorepo": "file:..",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "chai": "^4.3.7",
+    "ethers": "^6.13.1",
+    "hardhat": "^2.22.6"
+  }
+}
