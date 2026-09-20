@@ -2,7 +2,7 @@ const Loan = require('../models/Loan');
 const User = require('../models/User');
 const ProtocolStats = require('../models/ProtocolStats');
 
-async function recalculateProtocolStats() {
+async function recalculateProtocolStats(currentBlock = 0) {
   try {
     const [totalUsers, loans] = await Promise.all([
       User.countDocuments(),
@@ -11,25 +11,55 @@ async function recalculateProtocolStats() {
 
     const totalLoans = loans.length;
     let activeLoans = 0;
-    let completedLoans = 0;
+    let repaidLoans = 0;
     let defaultedLoans = 0;
     let totalVolumeBigInt = 0n;
+    let totalLentBigInt = 0n;
+    let totalRepaidBigInt = 0n;
+    let totalInterestBigInt = 0n;
     let totalInterestRateSum = 0;
+    let maxBlock = currentBlock;
 
     for (const loan of loans) {
-      if (loan.status === 1) activeLoans++;
-      if (loan.status === 2) completedLoans++;
-      if (loan.status === 3) defaultedLoans++;
+      const principalStr = loan.principal || loan.amount || '0';
+      const principalBigInt = BigInt(principalStr);
+      totalVolumeBigInt += principalBigInt;
+      totalInterestRateSum += Number(loan.interestRateBps || loan.interestRate || 0);
 
-      totalVolumeBigInt += BigInt(loan.amount || '0');
-      totalInterestRateSum += Number(loan.interestRate || 0);
+      if (loan.blockNumber && loan.blockNumber > maxBlock) {
+        maxBlock = loan.blockNumber;
+      }
+
+      if (loan.status === 1) {
+        // ACTIVE
+        activeLoans++;
+        totalLentBigInt += principalBigInt;
+      } else if (loan.status === 2) {
+        // REPAID
+        repaidLoans++;
+        totalLentBigInt += principalBigInt;
+        const repaidAmount = BigInt(loan.totalRepaid || loan.totalDue || principalStr);
+        totalRepaidBigInt += repaidAmount;
+        if (repaidAmount > principalBigInt) {
+          totalInterestBigInt += repaidAmount - principalBigInt;
+        }
+      } else if (loan.status === 3) {
+        // DEFAULTED
+        defaultedLoans++;
+        totalLentBigInt += principalBigInt;
+      }
     }
 
-    const settledCount = completedLoans + defaultedLoans;
+    const settledCount = repaidLoans + defaultedLoans;
     const repaymentRate =
       settledCount > 0
-        ? Number(((completedLoans / settledCount) * 100).toFixed(1))
+        ? Number(((repaidLoans / settledCount) * 100).toFixed(1))
         : 100;
+
+    const defaultRate =
+      settledCount > 0
+        ? Number(((defaultedLoans / settledCount) * 100).toFixed(1))
+        : 0;
 
     const averageLoanAmount =
       totalLoans > 0
@@ -44,11 +74,17 @@ async function recalculateProtocolStats() {
     const stats = {
       totalUsers,
       totalLoans,
-      totalVolume: totalVolumeBigInt.toString(),
       activeLoans,
-      completedLoans,
+      repaidLoans,
+      completedLoans: repaidLoans,
       defaultedLoans,
+      totalVolume: totalVolumeBigInt.toString(),
+      totalLent: totalLentBigInt.toString(),
+      totalRepaid: totalRepaidBigInt.toString(),
+      totalInterest: totalInterestBigInt.toString(),
       repaymentRate,
+      defaultRate,
+      lastIndexedBlock: maxBlock,
       averageLoanAmount,
       averageInterestRate,
       lastCalculatedAt: new Date(),
@@ -66,3 +102,4 @@ async function recalculateProtocolStats() {
 module.exports = {
   recalculateProtocolStats,
 };
+

@@ -9,6 +9,7 @@ const loanRoutes = require('./routes/loanRoutes');
 const userRoutes = require('./routes/userRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 const userController = require('./controllers/userController');
 
 const app = express();
@@ -18,11 +19,15 @@ const PORT = process.env.PORT || 5000;
 app.use(helmet());
 app.use(cors({ origin: true, credentials: true }));
 
-// Express JSON body parser with rawBody preservation for HMAC signature verification
+// For webhooks: preserve untouched raw body Buffer for HMAC-SHA256 signature verification
+app.use('/api/webhooks', express.raw({ type: '*/*', limit: '10mb' }));
+
+// Standard JSON body parser for REST APIs
 app.use(
   express.json({
+    limit: '10mb',
     verify: (req, res, buf) => {
-      req.rawBody = buf.toString();
+      req.rawBody = buf.toString('utf8');
     },
   })
 );
@@ -40,9 +45,10 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     service: 'CrediFi Backend API',
     network: 'Ethereum Sepolia',
-    chainId: process.env.CHAIN_ID || 11155111,
+    chainId: Number(process.env.CHAIN_ID || 11155111),
     database: dbStatusMap[dbState] || 'unknown',
     timestamp: new Date().toISOString(),
+    _notice: 'Indexed read-optimized view. Ethereum Sepolia smart contracts are the sole financial authority.',
   });
 });
 
@@ -63,6 +69,8 @@ app.use('/api/users', userRoutes);
 app.get('/api/transactions/:wallet', userController.getUserTransactions);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/webhooks', webhookRoutes);
+app.use('/api/admin', adminRoutes);
+
 
 // 404 Handler
 app.use((req, res) => {

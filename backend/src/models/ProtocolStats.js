@@ -11,10 +11,26 @@ const ProtocolStatsSchema = new mongoose.Schema(
       default: 0,
     },
     totalVolume: {
-      type: String, // In 6 decimals string
+      type: String, // In 6 decimals string (USDC)
+      default: '0',
+    },
+    totalLent: {
+      type: String, // Total volume funded
+      default: '0',
+    },
+    totalRepaid: {
+      type: String, // Total principal/interest repaid
+      default: '0',
+    },
+    totalInterest: {
+      type: String, // Total interest earned
       default: '0',
     },
     activeLoans: {
+      type: Number,
+      default: 0,
+    },
+    repaidLoans: {
       type: Number,
       default: 0,
     },
@@ -29,6 +45,14 @@ const ProtocolStatsSchema = new mongoose.Schema(
     repaymentRate: {
       type: Number, // Percentage (e.g. 95.5)
       default: 100,
+    },
+    defaultRate: {
+      type: Number, // Percentage (e.g. 4.5)
+      default: 0,
+    },
+    lastIndexedBlock: {
+      type: Number,
+      default: 0,
     },
     averageLoanAmount: {
       type: String,
@@ -48,4 +72,15 @@ const ProtocolStatsSchema = new mongoose.Schema(
   }
 );
 
+// Keep completedLoans and repaidLoans in sync
+ProtocolStatsSchema.pre('save', function (next) {
+  if (this.repaidLoans && !this.completedLoans) {
+    this.completedLoans = this.repaidLoans;
+  } else if (this.completedLoans && !this.repaidLoans) {
+    this.repaidLoans = this.completedLoans;
+  }
+  next();
+});
+
 module.exports = mongoose.models.ProtocolStats || mongoose.model('ProtocolStats', ProtocolStatsSchema);
+
