@@ -2,7 +2,8 @@ import React from 'react';
 import { ShieldCheck, TrendingUp, Info } from 'lucide-react';
 import { getCreditTier } from '../utils/constants';
 
-export default function CreditScoreCard({ score = 500, loading = false }) {
+export default function CreditScoreCard({ score = 500, loading = false, initialLoading }) {
+  const showPlaceholder = initialLoading !== undefined ? initialLoading : loading;
   const tier = getCreditTier(score);
   // Calculate percentage between 300 and 850
   const percentage = Math.min(Math.max(((score - 300) / (850 - 300)) * 100, 0), 100);
@@ -26,7 +27,7 @@ export default function CreditScoreCard({ score = 500, loading = false }) {
 
       <div className="flex items-baseline space-x-3 my-3">
         <span className="text-5xl font-black tracking-tight text-white font-mono">
-          {loading ? '---' : score}
+          {showPlaceholder ? '---' : score}
         </span>
         <span className="text-xs text-slate-500 font-mono">/ 850 Max</span>
       </div>

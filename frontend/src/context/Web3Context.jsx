@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { ethers } from 'ethers';
 import { CHAIN_ID, CONTRACT_ADDRESSES } from '../contracts/addresses';
 import {
@@ -18,6 +18,16 @@ export function Web3Provider({ children }) {
   const [connectionError, setConnectionError] = useState(null);
   const [tokenBalance, setTokenBalance] = useState(0n);
   const [ethBalance, setEthBalance] = useState(0n);
+
+  const accountRef = useRef(account);
+  const providerRef = useRef(provider);
+  const signerRef = useRef(signer);
+
+  useEffect(() => {
+    accountRef.current = account;
+    providerRef.current = provider;
+    signerRef.current = signer;
+  }, [account, provider, signer]);
 
   const isCorrectNetwork = chainId === Number(CHAIN_ID);
 
@@ -46,7 +56,7 @@ export function Web3Provider({ children }) {
 
     setIsConnecting(true);
     try {
-      const browserProvider = new ethers.BrowserProvider(window.ethereum);
+      const browserProvider = providerRef.current || new ethers.BrowserProvider(window.ethereum);
       const accounts = await browserProvider.send('eth_requestAccounts', []);
       const network = await browserProvider.getNetwork();
       const currentSigner = await browserProvider.getSigner();
@@ -82,8 +92,9 @@ export function Web3Provider({ children }) {
     setConnectionError(null);
     try {
       await switchChain(CHAIN_ID);
-      if (provider) {
-        const net = await provider.getNetwork();
+      const currentProvider = providerRef.current || (window.ethereum ? new ethers.BrowserProvider(window.ethereum) : null);
+      if (currentProvider) {
+        const net = await currentProvider.getNetwork();
         setChainId(Number(net.chainId));
       }
     } catch (err) {
@@ -94,7 +105,7 @@ export function Web3Provider({ children }) {
       }
       setConnectionError(readable);
     }
-  }, [provider]);
+  }, []);
 
   // Eagerly check if wallet was previously connected
   useEffect(() => {
@@ -103,7 +114,7 @@ export function Web3Provider({ children }) {
     let isMounted = true;
     const checkActiveConnection = async () => {
       try {
-        const browserProvider = new ethers.BrowserProvider(window.ethereum);
+        const browserProvider = providerRef.current || new ethers.BrowserProvider(window.ethereum);
         const accounts = await browserProvider.send('eth_accounts', []);
         if (accounts.length > 0 && isMounted) {
           const network = await browserProvider.getNetwork();
@@ -122,25 +133,41 @@ export function Web3Provider({ children }) {
 
     checkActiveConnection();
 
-    const handleAccountsChanged = (accounts) => {
+    const handleAccountsChanged = async (accounts) => {
+      if (!isMounted) return;
       if (accounts.length === 0) {
         disconnectWallet();
       } else {
         const newAccount = ethers.getAddress(accounts[0]);
         setAccount(newAccount);
-        if (provider) {
-          provider.getSigner().then((newSigner) => {
-            setSigner(newSigner);
-            refreshBalances(newAccount, newSigner);
-          });
+        try {
+          const currentProvider = providerRef.current || new ethers.BrowserProvider(window.ethereum);
+          if (!providerRef.current) setProvider(currentProvider);
+          const newSigner = await currentProvider.getSigner();
+          setSigner(newSigner);
+          refreshBalances(newAccount, newSigner);
+        } catch (e) {
+          console.warn('[Web3Context] Error updating account/signer on accountsChanged:', e);
         }
       }
     };
 
-    const handleChainChanged = (hexChainId) => {
-      setChainId(Number(hexChainId));
-      if (account && signer) {
-        refreshBalances(account, signer);
+    const handleChainChanged = async (hexChainId) => {
+      if (!isMounted) return;
+      const newChainId = Number(hexChainId);
+      setChainId(newChainId);
+      try {
+        const currentProvider = new ethers.BrowserProvider(window.ethereum);
+        setProvider(currentProvider);
+        const currentSigner = await currentProvider.getSigner();
+        setSigner(currentSigner);
+        if (accountRef.current) {
+          refreshBalances(accountRef.current, currentSigner);
+        }
+      } catch {
+        if (accountRef.current && signerRef.current) {
+          refreshBalances(accountRef.current, signerRef.current);
+        }
       }
     };
 
@@ -149,12 +176,12 @@ export function Web3Provider({ children }) {
 
     return () => {
       isMounted = false;
-      if (window.ethereum.removeListener) {
+      if (window.ethereum?.removeListener) {
         window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
         window.ethereum.removeListener('chainChanged', handleChainChanged);
       }
     };
-  }, [provider, account, signer, disconnectWallet, refreshBalances]);
+  }, [disconnectWallet, refreshBalances]);
 
   return (
     <Web3Context.Provider

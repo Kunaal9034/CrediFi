@@ -8,7 +8,10 @@ export default function BorrowingPowerCard({
   availableBorrowingPower,
   outstandingPrincipal = 0n,
   loading = false,
+  initialLoading,
 }) {
+  const showPlaceholder = initialLoading !== undefined ? initialLoading : loading;
+
   // If availableBorrowingPower is not explicitly passed, fallback to limit
   const available = availableBorrowingPower !== undefined ? availableBorrowingPower : limit;
 
@@ -39,7 +42,7 @@ export default function BorrowingPowerCard({
         {/* Hero Value: Available Borrowing Power */}
         <div className="flex items-baseline space-x-2 my-2">
           <span className="text-4xl font-extrabold tracking-tight text-white font-mono">
-            ${loading ? '---' : formatUSDC(available)}
+            ${showPlaceholder ? '---' : formatUSDC(available)}
           </span>
           <span className="text-xs text-cyan-400 font-semibold uppercase font-mono">mUSDC</span>
         </div>
@@ -57,13 +60,13 @@ export default function BorrowingPowerCard({
           <div>
             <span className="text-slate-400 block text-[11px]">Total Credit Limit</span>
             <span className="font-semibold text-slate-200">
-              ${loading ? '---' : formatUSDC(limit)}
+              ${showPlaceholder ? '---' : formatUSDC(limit)}
             </span>
           </div>
           <div className="text-right">
             <span className="text-slate-400 block text-[11px]">Current Exposure</span>
             <span className="font-semibold text-rose-400">
-              ${loading ? '---' : formatUSDC(outstandingPrincipal)}
+              ${showPlaceholder ? '---' : formatUSDC(outstandingPrincipal)}
             </span>
           </div>
         </div>

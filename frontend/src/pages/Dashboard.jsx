@@ -21,6 +21,8 @@ export default function Dashboard() {
     outstandingPrincipal,
     profile,
     loading: creditLoading,
+    isRefreshing: creditRefreshing,
+    initialLoading,
     refresh: refreshCredit,
   } = useCredit();
   const { fundLoan, repayLoan, status, txHash, error, reset, isPending } = useLoan();
@@ -103,7 +105,7 @@ export default function Dashboard() {
           }}
           className="self-start sm:self-auto px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs font-medium text-slate-300 flex items-center space-x-2 transition-colors"
         >
-          <RefreshCw size={13} className={creditLoading || loansLoading ? 'animate-spin' : ''} />
+          <RefreshCw size={13} className={creditLoading || creditRefreshing || loansLoading ? 'animate-spin' : ''} />
           <span>Refresh Onchain State</span>
         </button>
       </div>
@@ -121,12 +123,13 @@ export default function Dashboard() {
 
       {/* Primary Cards Grid: Score + Borrowing Power */}
       <div className="grid md:grid-cols-2 gap-6 mb-8">
-        <CreditScoreCard score={score} loading={creditLoading} />
+        <CreditScoreCard score={score} loading={creditLoading} initialLoading={initialLoading} />
         <BorrowingPowerCard
           limit={limit}
           availableBorrowingPower={availableBorrowingPower}
           outstandingPrincipal={outstandingPrincipal}
           loading={creditLoading}
+          initialLoading={initialLoading}
         />
       </div>
 

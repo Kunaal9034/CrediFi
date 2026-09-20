@@ -115,7 +115,7 @@ export async function fetchOnchainCreditProfile(account, runner) {
     };
   } catch (err) {
     console.error('[blockchain.js] Failed to fetch onchain credit profile:', err);
-    return defaultState;
+    throw err;
   }
 }
 
