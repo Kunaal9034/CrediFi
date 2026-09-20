@@ -19,29 +19,42 @@ LoanManager (Protocol Orchestrator)
 2. **`CreditRegistry.sol`**:
    - Maintains `CreditProfile` mapping per address:
      - `score` (uint256, initial 500, min 300, max 850)
-     - `loansTaken` (uint256)
-     - `loansRepaid` (uint256)
-     - `defaults` (uint256)
+     - `totalLoans` (uint256)
+     - `repaidLoans` (uint256)
+     - `defaultedLoans` (uint256)
      - `totalBorrowed` (uint256)
      - `totalRepaid` (uint256)
-   - Scoring rules (configurable hackathon parameters):
+     - `lastUpdated` (uint256)
+   - Scoring rules (deterministic integer arithmetic):
      - Base score: `500`
      - On-time repayment: `+50`
-     - Early repayment bonus: `+20`
+     - Early repayment bonus: `+20` (total `+70`)
      - Late repayment penalty: `-40`
      - Default penalty: `-150`
+     - Clamped to $[300, 850]$.
    - Borrowing Limit Formula (Deterministic, 6 decimals):
      $$ \text{borrowingLimit} = \frac{\text{BASE\_LIMIT} \times \text{creditScore}}{\text{BASE\_SCORE}} $$
      - `BASE_SCORE` = 500, `BASE_LIMIT` = $500 \times 10^6$ units ($500.00$ MockUSDC)
-     - `MIN_LIMIT` = $100 \times 10^6$ units, `MAX_LIMIT` = $1,500 \times 10^6$ units
      - If `creditScore < 350`, `borrowingLimit = 0` (delinquent borrower cutoff).
+     - Score 500: $500.00$ MockUSDC ($500 \times 10^6$ units)
+     - Score 570: $570.00$ MockUSDC ($570 \times 10^6$ units)
+     - Score 640: $640.00$ MockUSDC ($640 \times 10^6$ units)
+     - Score 850: $850.00$ MockUSDC ($850 \times 10^6$ units)
    - Access Control: Mutations restricted strictly to `onlyLoanManager`:
-     - `recordLoan(address borrower, uint256 amount) external onlyLoanManager`
-     - `recordRepayment(address borrower, uint256 amount, bool onTime, bool early) external onlyLoanManager`
-     - `recordDefault(address borrower) external onlyLoanManager`
+     - `recordLoan(address borrower, uint256 principal) external onlyLoanManager`
+     - `recordRepayment(address borrower, uint256 principal, bool onTime, bool early) external onlyLoanManager`
+     - `recordDefault(address borrower, uint256 principal) external onlyLoanManager`
+     - `setLoanManager(address _loanManager) external onlyOwner`
+   - Events emitted:
+     - `CreditProfileUpdated(address indexed borrower, uint256 score, uint256 borrowingLimit)`
+     - `LoanRecorded(address indexed borrower, uint256 principal, uint256 totalBorrowed)`
+     - `RepaymentRecorded(address indexed borrower, uint256 principal, uint256 newScore)`
+     - `DefaultRecorded(address indexed borrower, uint256 principal, uint256 newScore)`
+     - `LoanManagerUpdated(address indexed previousManager, address indexed newManager)`
    - Public view functions:
      - `getCreditScore(address borrower) external view returns (uint256)`
      - `getBorrowingLimit(address borrower) external view returns (uint256)`
+     - `getProfile(address borrower) external view returns (CreditProfile memory)`
      - `getCreditProfile(address borrower) external view returns (CreditProfile memory)`
 
 3. **`LoanManager.sol`**:

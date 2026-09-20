@@ -218,7 +218,7 @@ contract LoanManager is Ownable, ReentrancyGuard {
         loan.status = LoanStatus.DEFAULTED;
 
         // Penalize credit profile in CreditRegistry
-        creditRegistry.recordDefault(loan.borrower);
+        creditRegistry.recordDefault(loan.borrower, loan.principal);
 
         emit LoanDefaulted(loanId, loan.borrower, loan.lender);
     }
