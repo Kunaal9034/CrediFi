@@ -11,7 +11,7 @@ describe("LendingPool Contract", function () {
     [owner, loanManagerSigner, lender, borrower, stranger] = await ethers.getSigners();
 
     const MockUSDCFactory = await ethers.getContractFactory("MockUSDC");
-    mockUSDC = await MockUSDCFactory.deploy(owner.address);
+    mockUSDC = await MockUSDCFactory.deploy();
 
     const LendingPoolFactory = await ethers.getContractFactory("LendingPool");
     lendingPool = await LendingPoolFactory.deploy(await mockUSDC.getAddress(), owner.address);

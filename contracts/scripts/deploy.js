@@ -18,7 +18,7 @@ async function main() {
   // 1. Deploy MockUSDC
   console.log("[1/4] Deploying MockUSDC...");
   const MockUSDCFactory = await ethers.getContractFactory("MockUSDC");
-  const mockUSDC = await MockUSDCFactory.deploy(deployer.address);
+  const mockUSDC = await MockUSDCFactory.deploy();
   await mockUSDC.waitForDeployment();
   const mockUSDCAddress = await mockUSDC.getAddress();
   console.log(`✓ MockUSDC deployed at: ${mockUSDCAddress}`);

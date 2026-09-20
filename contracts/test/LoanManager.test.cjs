@@ -12,7 +12,7 @@ describe("LoanManager Contract", function () {
 
     // 1. Deploy MockUSDC
     const MockUSDCFactory = await ethers.getContractFactory("MockUSDC");
-    mockUSDC = await MockUSDCFactory.deploy(owner.address);
+    mockUSDC = await MockUSDCFactory.deploy();
 
     // 2. Deploy CreditRegistry
     const CreditRegistryFactory = await ethers.getContractFactory("CreditRegistry");

@@ -11,7 +11,8 @@ LoanManager (Protocol Orchestrator)
 
 1. **`MockUSDC.sol`**:
    - Standard ERC20 with 6 decimals (matching real USDC conventions).
-   - Public faucet function `faucet(address to, uint256 amount)` with safety caps for hackathon demo testing.
+   - Initial supply: 0 units.
+   - Public faucet function `faucet(address to, uint256 amount)` with safety cap of 10,000 mUSDC ($10,000 \times 10^6$ base units) per claim, emitting `FaucetMinted(address indexed to, uint256 amount)`.
    - Standard `approve`, `transfer`, `transferFrom`.
    - Zero awareness of loans, credit scores, or pools.
 
