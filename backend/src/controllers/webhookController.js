@@ -1,5 +1,20 @@
 const crypto = require('crypto');
+const { ethers } = require('ethers');
 const { processBlockchainEvent, isContractAllowed, EXPECTED_CHAIN_ID } = require('../services/eventProcessor');
+
+const LOAN_MANAGER_EVENTS_ABI = [
+  'event LoanCreated(uint256 indexed loanId, address indexed borrower, uint256 principal, uint256 interestRateBps, uint256 duration, uint256 totalDue, uint256 dueDate)',
+  'event LoanFunded(uint256 indexed loanId, address indexed lender, address indexed borrower, uint256 principal, uint256 dueDate)',
+  'event LoanRepaid(uint256 indexed loanId, address indexed borrower, address indexed lender, uint256 principal, uint256 totalDue, uint8 repaymentType)',
+  'event LoanDefaulted(uint256 indexed loanId, address indexed borrower, address indexed lender, uint256 principal)',
+];
+
+const CREDIT_REGISTRY_EVENTS_ABI = [
+  'event CreditProfileUpdated(address indexed borrower, uint256 score, uint256 borrowingLimit)',
+];
+
+const lmInterface = new ethers.Interface(LOAN_MANAGER_EVENTS_ABI);
+const crInterface = new ethers.Interface(CREDIT_REGISTRY_EVENTS_ABI);
 
 /**
  * Validates HMAC SHA-256 signature using constant-time comparison
@@ -121,17 +136,54 @@ exports.handleAlchemyWebhook = async (req, res) => {
     for (const log of logs) {
       const contractAddress = log.account?.address || log.address || log.contractAddress;
       if (contractAddress && !isContractAllowed(contractAddress)) {
-        return res.status(400).json({
-          error: `Unknown contract address: ${contractAddress}`,
-        });
+        // If this log explicitly specifies an eventName for an untrusted contract, reject with 400
+        if (log.eventName || log.eventType) {
+          return res.status(400).json({
+            error: `Unknown contract address: ${contractAddress}`,
+          });
+        }
+        // In a block stream (e.g. Alchemy block logs), safely ignore logs from other unrelated contracts
+        continue;
       }
 
       const txHash = log.transaction?.hash || log.transactionHash || log.hash;
       const logIndex = log.index !== undefined ? log.index : (log.logIndex !== undefined ? log.logIndex : 0);
-      const eventName = log.eventName || log.eventType || log.name;
+      let eventName = log.eventName || log.eventType || log.name;
       const blockNumber = log.block?.number || log.blockNumber || payload.event?.data?.block?.number || 0;
       const blockTimestamp = log.block?.timestamp || log.timestamp || Math.floor(Date.now() / 1000);
-      const args = log.args || log.decoded || log.params || {};
+      let args = log.args || log.decoded || log.params || {};
+
+      // If raw topics & data are provided without pre-parsed eventName, decode them using ethers Interface
+      if (!eventName && Array.isArray(log.topics) && log.topics.length > 0) {
+        try {
+          const rawLog = { topics: log.topics, data: log.data || '0x' };
+          let parsed = null;
+          const normContract = (contractAddress || '').toLowerCase();
+          const loanManagerAddr = (process.env.LOAN_MANAGER_ADDRESS || '0x21b39401646D783690E3902C90963c711Ff7cC1C').toLowerCase();
+          const creditRegistryAddr = (process.env.CREDIT_REGISTRY_ADDRESS || '0x9b117D9528c43Fb2938e43172b1935f38F2C6f90').toLowerCase();
+
+          if (normContract === loanManagerAddr) {
+            parsed = lmInterface.parseLog(rawLog);
+          } else if (normContract === creditRegistryAddr) {
+            parsed = crInterface.parseLog(rawLog);
+          } else {
+            try { parsed = lmInterface.parseLog(rawLog); } catch {}
+            if (!parsed) {
+              try { parsed = crInterface.parseLog(rawLog); } catch {}
+            }
+          }
+
+          if (parsed) {
+            eventName = parsed.name;
+            args = {};
+            for (const input of parsed.fragment.inputs) {
+              args[input.name] = parsed.args[input.name].toString();
+            }
+          }
+        } catch (decodeErr) {
+          // If not a recognized event from our ABIs, ignore safely
+        }
+      }
 
       if (txHash && eventName) {
         try {
