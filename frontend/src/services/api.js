@@ -33,5 +33,8 @@ export const api = {
   getUserLoans: (wallet) => request(`/loans/user/${wallet}`),
   getLoanById: (loanId) => request(`/loans/${loanId}`),
   getTransactions: (wallet) => request(`/transactions/${wallet}`),
-  getAnalytics: () => request('/analytics'),
+  getAnalytics: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/analytics${query ? `?${query}` : ''}`);
+  },
 };

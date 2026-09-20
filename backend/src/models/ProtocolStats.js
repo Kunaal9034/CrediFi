@@ -62,6 +62,25 @@ const ProtocolStatsSchema = new mongoose.Schema(
       type: Number, // Basis points
       default: 1000,
     },
+    averageDurationDays: {
+      type: Number,
+      default: 14,
+    },
+    volumeHistory: [
+      {
+        period: { type: String, required: true },
+        volume: { type: String, default: '0' },
+        volumeFormatted: { type: Number, default: 0 },
+        cumulativeVolume: { type: Number, default: 0 },
+        loanCount: { type: Number, default: 0 },
+      },
+    ],
+    creditScoreDistribution: {
+      poor: { type: Number, default: 0 }, // 300 - 579
+      fair: { type: Number, default: 0 }, // 580 - 669
+      good: { type: Number, default: 0 }, // 670 - 739
+      excellent: { type: Number, default: 0 }, // 740 - 850
+    },
     lastCalculatedAt: {
       type: Date,
       default: Date.now,
