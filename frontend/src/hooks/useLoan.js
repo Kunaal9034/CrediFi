@@ -75,11 +75,13 @@ export function useLoan() {
   };
 
   const [fundedLoan, setFundedLoan] = useState(null);
+  const [repaidLoan, setRepaidLoan] = useState(null);
 
   const resetAll = () => {
     tx.reset();
     setCreatedLoan(null);
     setFundedLoan(null);
+    setRepaidLoan(null);
   };
 
   // 2. Approve LendingPool to spend MockUSDC
@@ -196,27 +198,131 @@ export function useLoan() {
     return { receipt, fundedLoan: fundedInfo };
   };
 
-  // 4. Repay Loan (Handles approval if necessary)
-  const repayLoan = async (loanId, totalDue) => {
-    if (!signer) throw new Error('Please connect your MetaMask wallet');
+  // 4. Repay Loan (Borrower settles active loan)
+  const repayLoan = async (loanId, onStateRefresh) => {
+    if (!account) throw new Error('Please connect your MetaMask wallet');
+    if (!signer) throw new Error('Signer not available. Please unlock MetaMask');
+    if (!isCorrectNetwork) throw new Error('Please switch to Ethereum Sepolia (Chain ID 11155111)');
+
     const loanManager = getContract('loanManager', signer);
     const mockUSDC = getContract('mockUSDC', signer);
+    const creditRegistry = getContract('creditRegistry', signer);
     const lendingPoolAddress = CONTRACT_ADDRESSES.lendingPool;
 
-    if (!loanManager || !mockUSDC) throw new Error('Contracts not initialized');
+    if (!loanManager || !mockUSDC || !creditRegistry) throw new Error('Contracts not initialized');
 
-    return await tx.executeTransaction(async () => {
-      // Check allowance
-      const currentAllowance = await mockUSDC.allowance(account, lendingPoolAddress);
-      if (currentAllowance < totalDue) {
-        const approveTx = await mockUSDC.approve(lendingPoolAddress, ethers.MaxUint256);
-        await approveTx.wait();
+    // Fresh onchain check of loan terms and status before broadcast
+    const onchainLoan = await loanManager.getLoan(loanId);
+    if (!onchainLoan || onchainLoan.loanId === 0n) {
+      throw new Error('Loan does not exist onchain');
+    }
+    if (Number(onchainLoan.status) !== 1) {
+      throw new Error('This loan is no longer active (status is not ACTIVE)');
+    }
+    if (onchainLoan.borrower.toLowerCase() !== account.toLowerCase()) {
+      throw new Error('Only the borrower can repay this loan');
+    }
+
+    // Check borrower balance
+    const borrowerBalance = await mockUSDC.balanceOf(account);
+    if (borrowerBalance < onchainLoan.totalDue) {
+      throw new Error('Insufficient MockUSDC balance to repay this loan');
+    }
+
+    // Check allowance
+    const allowance = await mockUSDC.allowance(account, lendingPoolAddress);
+    if (allowance < onchainLoan.totalDue) {
+      throw new Error('Insufficient MockUSDC allowance. Please approve LendingPool first');
+    }
+
+    // Record pre-repayment state
+    let scoreBefore = 500;
+    let limitBefore = 0n;
+    let outstandingBefore = 0n;
+    try {
+      scoreBefore = await creditRegistry.getCreditScore(account);
+      limitBefore = await creditRegistry.getBorrowingLimit(account);
+      outstandingBefore = await loanManager.getOutstandingPrincipal(account);
+    } catch (err) {
+      console.warn('[useLoan] Could not read pre-repayment credit metrics:', err);
+    }
+
+    setRepaidLoan(null);
+
+    const receipt = await tx.executeTransaction(
+      async () => {
+        return await loanManager.repayLoan(loanId);
+      },
+      async () => {
+        await refreshBalances();
+        if (onStateRefresh) await onStateRefresh();
       }
+    );
 
-      // Repay
-      const transaction = await loanManager.repayLoan(loanId);
-      return transaction;
-    });
+    // Parse LoanRepaid event from logs
+    let extractedLoanId = null;
+    let extractedBorrower = null;
+    let extractedLender = null;
+    let extractedPrincipal = null;
+    let extractedTotalDue = null;
+    let extractedRepType = null;
+
+    if (receipt && receipt.logs) {
+      for (const log of receipt.logs) {
+        try {
+          const parsed = loanManager.interface.parseLog(log);
+          if (parsed && parsed.name === 'LoanRepaid') {
+            extractedLoanId = Number(parsed.args.loanId);
+            extractedBorrower = parsed.args.borrower;
+            extractedLender = parsed.args.lender;
+            extractedPrincipal = parsed.args.principal;
+            extractedTotalDue = parsed.args.totalDue;
+            extractedRepType = Number(parsed.args.repaymentType);
+            break;
+          }
+        } catch {
+          // Skip non-matching event
+        }
+      }
+    }
+
+    let updatedLoan = null;
+    let scoreAfter = scoreBefore;
+    let limitAfter = limitBefore;
+    let outstandingAfter = outstandingBefore;
+    let borrowerBalanceAfter = 0n;
+
+    try {
+      updatedLoan = await fetchLoanDetails(loanId, signer);
+      scoreAfter = await creditRegistry.getCreditScore(account);
+      limitAfter = await creditRegistry.getBorrowingLimit(account);
+      outstandingAfter = await loanManager.getOutstandingPrincipal(account);
+      borrowerBalanceAfter = await mockUSDC.balanceOf(account);
+    } catch (e) {
+      console.warn('[useLoan] Failed to fetch updated repaid loan details:', e);
+    }
+
+    const repaidInfo = {
+      loanId: extractedLoanId || Number(loanId),
+      txHash: receipt ? receipt.hash : null,
+      borrower: extractedBorrower || onchainLoan.borrower,
+      lender: extractedLender || onchainLoan.lender,
+      principal: extractedPrincipal || onchainLoan.principal,
+      totalDue: extractedTotalDue || onchainLoan.totalDue,
+      interest: (extractedTotalDue || onchainLoan.totalDue) - (extractedPrincipal || onchainLoan.principal),
+      repType: extractedRepType,
+      scoreBefore: Number(scoreBefore),
+      scoreAfter: Number(scoreAfter),
+      limitBefore,
+      limitAfter,
+      outstandingBefore,
+      outstandingAfter,
+      borrowerBalanceAfter,
+      loan: updatedLoan,
+    };
+
+    setRepaidLoan(repaidInfo);
+    return { receipt, repaidLoan: repaidInfo };
   };
 
   // 5. Claim Demo Faucet Tokens
@@ -237,6 +343,7 @@ export function useLoan() {
     ...tx,
     createdLoan,
     fundedLoan,
+    repaidLoan,
     reset: resetAll,
     requestLoan,
     approveLendingPool,

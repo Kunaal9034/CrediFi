@@ -82,7 +82,7 @@ export default function LoanTable({
 
                   {Number(loan.status) === 1 && isBorrower && onRepay && (
                     <button
-                      onClick={() => onRepay(loan.loanId, loan.totalDue || loan.principal)}
+                      onClick={() => onRepay(loan.loanId, loan)}
                       disabled={isProcessing}
                       className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition-all disabled:opacity-50"
                     >
