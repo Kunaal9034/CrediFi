@@ -58,23 +58,64 @@ LoanManager (Protocol Orchestrator)
      - `getCreditProfile(address borrower) external view returns (CreditProfile memory)`
 
 3. **`LoanManager.sol`**:
-   - Protocol orchestrator. Determines and validates all loan states.
-   - **Enforces Undercollateralized / Unsecured Borrowing Limit Onchain:**
+   - Protocol orchestrator and state machine. Enforces loan lifecycles, onchain borrowing capacity, rate/duration limits, and coordinates with `CreditRegistry` and `LendingPool`.
+   - **Loan Structure (`Loan`):**
+     - `uint256 loanId`: Deterministic sequence counter.
+     - `address borrower`: Loan creator (`msg.sender`).
+     - `address lender`: Funder address (set upon `fundLoan`).
+     - `uint256 principal`: Borrowed base units in MockUSDC (6 decimals).
+     - `uint256 interestRateBps`: Annualized simple interest rate [1, 2000] (0.01% - 20.00%).
+     - `uint256 duration`: Loan duration in seconds [1 day, 365 days].
+     - `uint256 totalDue`: Principal + computed annualized simple interest.
+     - `uint256 createdAt`: Timestamp when loan request was created.
+     - `uint256 dueDate`: Final due date timestamp (finalized upon funding as `block.timestamp + duration`).
+     - `LoanStatus status`: Strict 4-state enum (`REQUESTED`, `ACTIVE`, `REPAID`, `DEFAULTED`).
+   - **Onchain Borrowing-Capacity & Outstanding Debt Exposure:**
+     - Tracks cumulative exposure per borrower: `mapping(address => uint256) public outstandingPrincipal;` (represents sum of `REQUESTED` and `ACTIVE` principal).
+     - New loans must strictly satisfy:
+       ```solidity
+       uint256 availablePower = getAvailableBorrowingPower(msg.sender);
+       require(principal <= availablePower, "LoanManager: Requested amount exceeds onchain borrowing limit");
+       ```
+     - Borrowers cannot bypass limits by submitting multiple concurrent `REQUESTED` loans; exposure is reserved immediately at `createLoan()`.
+     - `fundLoan()` transitions to `ACTIVE` without adding exposure again.
+     - `repayLoan()` and `markDefault()` release exposure (`outstandingPrincipal -= principal`).
+   - **Exact Interest Formula (Solidity Integer Arithmetic):**
      ```solidity
-     uint256 limit = creditRegistry.getBorrowingLimit(msg.sender);
-     require(amount <= limit, "LoanManager: Requested amount exceeds onchain borrowing limit");
-     ```
-   - **Exact Interest Formula (Basis Points):**
-     ```solidity
-     function calculateInterest(uint256 principal, uint256 rateBps, uint256 duration) public pure returns (uint256) {
-         return (principal * rateBps * duration) / (365 days * 10000);
+     function calculateInterest(uint256 principal, uint256 interestRateBps, uint256 duration) public pure returns (uint256) {
+         return (principal * interestRateBps * duration) / (365 days * 10000);
+     }
+     function calculateTotalDue(uint256 principal, uint256 interestRateBps, uint256 duration) public pure returns (uint256) {
+         return principal + calculateInterest(principal, interestRateBps, duration);
      }
      ```
-   - Lifecycle functions & Credit Event Timing:
-     - `createLoan(uint256 amount, uint256 duration, uint256 interestRate)`: Validates amount <= borrowing limit; creates loan with status = `REQUESTED`; emits `LoanCreated`. (`CreditRegistry.recordLoan()` is **NOT** called here).
-     - `fundLoan(uint256 loanId)`: Transitions `REQUESTED -> ACTIVE`; triggers `LendingPool.transferFunds()`; calls `CreditRegistry.recordLoan(borrower, amount)` **after successful token transfer**; emits `LoanFunded`.
-     - `repayLoan(uint256 loanId)`: Transitions `ACTIVE -> REPAID`; triggers `LendingPool.executeRepayment()`; updates credit via `CreditRegistry.recordRepayment()`; emits `LoanRepaid` & `CreditProfileUpdated`.
-     - `markDefault(uint256 loanId)`: Transitions `ACTIVE -> DEFAULTED` if `block.timestamp > dueDate`; updates credit via `CreditRegistry.recordDefault()`; emits `LoanDefaulted` & `CreditProfileUpdated`.
+   - **Protocol Bounds & Constants:**
+     - `MIN_INTEREST_RATE_BPS = 1` (0.01% min APR)
+     - `MAX_INTEREST_RATE_BPS = 2000` (20.00% max APR)
+     - `MIN_DURATION = 1 days` (86,400 seconds)
+     - `MAX_DURATION = 365 days` (31,536,000 seconds)
+     - `DEFAULT_GRACE_PERIOD = 1 days` (86,400 seconds)
+   - **Repayment Classifications & Credit Timing:**
+     - `EARLY` (`block.timestamp < dueDate`): Calls `CreditRegistry.recordRepayment(borrower, principal, true, true)` -> **+70 score points**.
+     - `ON_TIME` (`dueDate <= block.timestamp <= dueDate + DEFAULT_GRACE_PERIOD`): Calls `CreditRegistry.recordRepayment(borrower, principal, true, false)` -> **+50 score points**.
+     - `LATE` (`block.timestamp > dueDate + DEFAULT_GRACE_PERIOD` while still `ACTIVE`): Calls `CreditRegistry.recordRepayment(borrower, principal, false, false)` -> **-40 score points**.
+   - **Default Mechanics:**
+     - Callable by anyone once `block.timestamp > dueDate + DEFAULT_GRACE_PERIOD`.
+     - Transitions `ACTIVE -> DEFAULTED`.
+     - Releases outstanding debt exposure.
+     - Calls `CreditRegistry.recordDefault(borrower, principal)` -> **-150 score penalty**.
+     - Zero collateral, no liquidation (pure unsecured lending).
+   - **Primary Protocol Events:**
+     - `LoanCreated(uint256 indexed loanId, address indexed borrower, uint256 principal, uint256 interestRateBps, uint256 duration, uint256 totalDue, uint256 dueDate)`
+     - `LoanFunded(uint256 indexed loanId, address indexed lender, address indexed borrower, uint256 principal, uint256 dueDate)`
+     - `LoanRepaid(uint256 indexed loanId, address indexed borrower, address indexed lender, uint256 principal, uint256 totalDue, RepaymentType repaymentType)`
+     - `LoanDefaulted(uint256 indexed loanId, address indexed borrower, address indexed lender, uint256 principal)`
+     - `ProtocolContractsUpdated(address indexed creditRegistry, address indexed lendingPool)`
+   - **Security & Access Control:**
+     - Inherits OpenZeppelin `Ownable` and `ReentrancyGuard`.
+     - External state-changing functions (`createLoan`, `fundLoan`, `repayLoan`, `markDefault`) protected by `nonReentrant`.
+     - Zero-address validation in constructor and admin setters (`setProtocolContracts`, `setCreditRegistry`, `setLendingPool`).
+     - Protocol contract configurations restricted to `onlyOwner`.
 
 4. **`LendingPool.sol`**:
    - Handles actual token movement.
@@ -86,7 +127,10 @@ LoanManager (Protocol Orchestrator)
 
 5. **Financial Mechanism Classification:**
    - **Model A: Credit-Based Unsecured Lending (Zero Collateral)**.
-   - Borrowing capacity is governed by onchain reputation. No collateral token is locked, deposited, or liquidated.
+   - Borrowing capacity is governed strictly by onchain reputation and credit score.
+   - Zero collateral is pledged, deposited, or locked.
+   - No collateral liquidation or auction mechanisms exist.
+   - Blockchain is the sole financial source of truth.
 
 ---
 
