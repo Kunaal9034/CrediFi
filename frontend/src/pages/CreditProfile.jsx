@@ -8,7 +8,14 @@ import { ShieldCheck, TrendingUp, AlertTriangle, CheckCircle, Info, Lock } from 
 
 export default function CreditProfile() {
   const { account, connectWallet, isConnecting } = useWallet();
-  const { score, limit, profile, loading } = useCredit();
+  const {
+    score,
+    limit,
+    availableBorrowingPower,
+    outstandingPrincipal,
+    profile,
+    loading,
+  } = useCredit();
 
   if (!account) {
     return (
@@ -46,7 +53,12 @@ export default function CreditProfile() {
 
       <div className="grid md:grid-cols-2 gap-6 mb-10">
         <CreditScoreCard score={score} loading={loading} />
-        <BorrowingPowerCard limit={limit} loading={loading} />
+        <BorrowingPowerCard
+          limit={limit}
+          availableBorrowingPower={availableBorrowingPower}
+          outstandingPrincipal={outstandingPrincipal}
+          loading={loading}
+        />
       </div>
 
       {/* Transparent Scoring Parameters */}

@@ -1,9 +1,14 @@
-// Export deployed smart contract addresses
+// Export deployed smart contract addresses for Ethereum Sepolia (Chain ID 11155111)
+// Sourced directly from contracts/deployments/sepolia.json
+
+export const CHAIN_ID = 11155111;
+
 export const CONTRACT_ADDRESSES = {
-  mockUSDC: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-  creditRegistry: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-  loanManager: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
-  lendingPool: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+  mockUSDC: "0xfaaF91778853F35FB7Db545dc3586aFc354103d0",
+  creditRegistry: "0x9b117D9528c43Fb2938e43172b1935f38F2C6f90",
+  lendingPool: "0x6c7540f597E70b983A19b3e9372d9cdDB062e4F5",
+  loanManager: "0x21b39401646D783690E3902C90963c711Ff7cC1C",
 };
 
-export const CHAIN_ID = 31337;
+export const EXPLORER_URL = "https://sepolia.etherscan.io";
+export const SEPOLIA_RPC_DEFAULT = "https://ethereum-sepolia-rpc.publicnode.com";

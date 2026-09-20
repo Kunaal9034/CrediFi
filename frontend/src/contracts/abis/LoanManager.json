@@ -71,13 +71,25 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "interestRate",
+        "name": "interestRateBps",
         "type": "uint256"
       },
       {
         "indexed": false,
         "internalType": "uint256",
         "name": "duration",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "totalDue",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "dueDate",
         "type": "uint256"
       }
     ],
@@ -104,6 +116,12 @@
         "internalType": "address",
         "name": "lender",
         "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "principal",
+        "type": "uint256"
       }
     ],
     "name": "LoanDefaulted",
@@ -125,9 +143,15 @@
         "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
+        "name": "borrower",
+        "type": "address"
+      },
+      {
         "indexed": false,
         "internalType": "uint256",
-        "name": "startTime",
+        "name": "principal",
         "type": "uint256"
       },
       {
@@ -156,22 +180,28 @@
         "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
+        "name": "lender",
+        "type": "address"
+      },
+      {
         "indexed": false,
         "internalType": "uint256",
-        "name": "totalPaid",
+        "name": "principal",
         "type": "uint256"
       },
       {
         "indexed": false,
-        "internalType": "bool",
-        "name": "onTime",
-        "type": "bool"
+        "internalType": "uint256",
+        "name": "totalDue",
+        "type": "uint256"
       },
       {
         "indexed": false,
-        "internalType": "bool",
-        "name": "early",
-        "type": "bool"
+        "internalType": "enum LoanManager.RepaymentType",
+        "name": "repaymentType",
+        "type": "uint8"
       }
     ],
     "name": "LoanRepaid",
@@ -217,6 +247,19 @@
   },
   {
     "inputs": [],
+    "name": "DEFAULT_GRACE_PERIOD",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "MAX_DURATION",
     "outputs": [
       {
@@ -230,7 +273,7 @@
   },
   {
     "inputs": [],
-    "name": "MAX_INTEREST_RATE",
+    "name": "MAX_INTEREST_RATE_BPS",
     "outputs": [
       {
         "internalType": "uint256",
@@ -252,6 +295,77 @@
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MIN_INTEREST_RATE_BPS",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "principal",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "interestRateBps",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "duration",
+        "type": "uint256"
+      }
+    ],
+    "name": "calculateInterest",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "pure",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "principal",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "interestRateBps",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "duration",
+        "type": "uint256"
+      }
+    ],
+    "name": "calculateTotalDue",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "pure",
     "type": "function"
   },
   {
@@ -277,17 +391,17 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "amount",
+        "name": "principal",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "interestRateBps",
         "type": "uint256"
       },
       {
         "internalType": "uint256",
         "name": "duration",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "interestRate",
         "type": "uint256"
       }
     ],
@@ -331,6 +445,25 @@
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "borrower",
+        "type": "address"
+      }
+    ],
+    "name": "getAvailableBorrowingPower",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "loanId",
         "type": "uint256"
@@ -362,7 +495,7 @@
           },
           {
             "internalType": "uint256",
-            "name": "interestRate",
+            "name": "interestRateBps",
             "type": "uint256"
           },
           {
@@ -372,7 +505,12 @@
           },
           {
             "internalType": "uint256",
-            "name": "startTime",
+            "name": "totalDue",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "createdAt",
             "type": "uint256"
           },
           {
@@ -389,6 +527,25 @@
         "internalType": "struct LoanManager.Loan",
         "name": "",
         "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "borrower",
+        "type": "address"
+      }
+    ],
+    "name": "getOutstandingPrincipal",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -434,6 +591,25 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "outstandingPrincipal",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "owner",
     "outputs": [
@@ -462,6 +638,32 @@
       }
     ],
     "name": "repayLoan",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_creditRegistry",
+        "type": "address"
+      }
+    ],
+    "name": "setCreditRegistry",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_lendingPool",
+        "type": "address"
+      }
+    ],
+    "name": "setLendingPool",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

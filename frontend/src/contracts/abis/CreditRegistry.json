@@ -44,19 +44,13 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "oldScore",
+        "name": "score",
         "type": "uint256"
       },
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "newScore",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "newLimit",
+        "name": "borrowingLimit",
         "type": "uint256"
       }
     ],
@@ -71,6 +65,12 @@
         "internalType": "address",
         "name": "borrower",
         "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "principal",
+        "type": "uint256"
       },
       {
         "indexed": false,
@@ -113,7 +113,7 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "amount",
+        "name": "principal",
         "type": "uint256"
       },
       {
@@ -157,20 +157,8 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "amount",
+        "name": "principal",
         "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "bool",
-        "name": "onTime",
-        "type": "bool"
-      },
-      {
-        "indexed": false,
-        "internalType": "bool",
-        "name": "early",
-        "type": "bool"
       },
       {
         "indexed": false,
@@ -184,7 +172,20 @@
   },
   {
     "inputs": [],
-    "name": "INITIAL_SCORE",
+    "name": "BASE_LIMIT",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "BASE_SCORE",
     "outputs": [
       {
         "internalType": "uint256",
@@ -223,7 +224,7 @@
   },
   {
     "inputs": [],
-    "name": "defaultPenalty",
+    "name": "SCORE_DEFAULT_PENALTY",
     "outputs": [
       {
         "internalType": "uint256",
@@ -236,7 +237,46 @@
   },
   {
     "inputs": [],
-    "name": "earlyRepaymentBonus",
+    "name": "SCORE_EARLY_BONUS",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "SCORE_LATE_PENALTY",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "SCORE_ON_TIME_REPAY",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "SUBPRIME_SCORE_CUTOFF",
     "outputs": [
       {
         "internalType": "uint256",
@@ -285,17 +325,17 @@
           },
           {
             "internalType": "uint256",
-            "name": "loansTaken",
+            "name": "totalLoans",
             "type": "uint256"
           },
           {
             "internalType": "uint256",
-            "name": "loansRepaid",
+            "name": "repaidLoans",
             "type": "uint256"
           },
           {
             "internalType": "uint256",
-            "name": "defaults",
+            "name": "defaultedLoans",
             "type": "uint256"
           },
           {
@@ -306,6 +346,11 @@
           {
             "internalType": "uint256",
             "name": "totalRepaid",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "lastUpdated",
             "type": "uint256"
           },
           {
@@ -342,13 +387,61 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "latePenalty",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "borrower",
+        "type": "address"
+      }
+    ],
+    "name": "getProfile",
     "outputs": [
       {
-        "internalType": "uint256",
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "score",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "totalLoans",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "repaidLoans",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "defaultedLoans",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "totalBorrowed",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "totalRepaid",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "lastUpdated",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "initialized",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct CreditRegistry.CreditProfile",
         "name": "",
-        "type": "uint256"
+        "type": "tuple"
       }
     ],
     "stateMutability": "view",
@@ -386,6 +479,11 @@
         "internalType": "address",
         "name": "borrower",
         "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "principal",
+        "type": "uint256"
       }
     ],
     "name": "recordDefault",
@@ -402,7 +500,7 @@
       },
       {
         "internalType": "uint256",
-        "name": "amount",
+        "name": "principal",
         "type": "uint256"
       }
     ],
@@ -420,7 +518,7 @@
       },
       {
         "internalType": "uint256",
-        "name": "amount",
+        "name": "principal",
         "type": "uint256"
       },
       {
@@ -444,19 +542,6 @@
     "name": "renounceOwnership",
     "outputs": [],
     "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "repaymentBonus",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
     "type": "function"
   },
   {

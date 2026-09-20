@@ -1,7 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
-import { CHAIN_ID } from '../contracts/addresses';
-import { switchNetwork as switchChain, fetchTokenBalance } from '../services/blockchain';
+import { CHAIN_ID, CONTRACT_ADDRESSES } from '../contracts/addresses';
+import {
+  switchNetwork as switchChain,
+  fetchTokenBalance,
+  getFallbackProvider,
+} from '../services/blockchain';
 
 const Web3Context = createContext(null);
 
@@ -11,28 +15,32 @@ export function Web3Provider({ children }) {
   const [signer, setSigner] = useState(null);
   const [chainId, setChainId] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionError, setConnectionError] = useState(null);
   const [tokenBalance, setTokenBalance] = useState(0n);
   const [ethBalance, setEthBalance] = useState(0n);
 
-  const isCorrectNetwork = chainId === Number(CHAIN_ID) || chainId === 31337;
+  const isCorrectNetwork = chainId === Number(CHAIN_ID);
 
   const refreshBalances = useCallback(async (currentAccount, currentSigner) => {
-    if (!currentAccount || !currentSigner) return;
+    if (!currentAccount) return;
     try {
+      const runner = currentSigner || getFallbackProvider();
       const [tokBal, ethBal] = await Promise.all([
-        fetchTokenBalance(currentAccount, currentSigner),
-        currentSigner.provider.getBalance(currentAccount),
+        fetchTokenBalance(currentAccount, runner),
+        (currentSigner?.provider || getFallbackProvider()).getBalance(currentAccount),
       ]);
       setTokenBalance(tokBal);
       setEthBalance(ethBal);
     } catch (err) {
-      console.warn('[Web3Context] Failed to refresh balances:', err);
+      console.warn('[Web3Context] Failed to refresh balances:', err.message || err);
     }
   }, []);
 
   const connectWallet = useCallback(async () => {
+    setConnectionError(null);
     if (!window.ethereum) {
-      alert('MetaMask is not detected. Please install MetaMask extension to use CrediFi.');
+      const msg = 'MetaMask is not detected. Please install the MetaMask extension to use CrediFi.';
+      setConnectionError(msg);
       return;
     }
 
@@ -43,7 +51,7 @@ export function Web3Provider({ children }) {
       const network = await browserProvider.getNetwork();
       const currentSigner = await browserProvider.getSigner();
 
-      const userAccount = accounts[0];
+      const userAccount = ethers.getAddress(accounts[0]);
       setAccount(userAccount);
       setProvider(browserProvider);
       setSigner(currentSigner);
@@ -52,6 +60,11 @@ export function Web3Provider({ children }) {
       await refreshBalances(userAccount, currentSigner);
     } catch (err) {
       console.error('[Web3Context] Error connecting wallet:', err);
+      let readable = 'Failed to connect wallet';
+      if (err.code === 4001 || err.message?.includes('rejected')) {
+        readable = 'Connection request was rejected in MetaMask';
+      }
+      setConnectionError(readable);
     } finally {
       setIsConnecting(false);
     }
@@ -62,9 +75,11 @@ export function Web3Provider({ children }) {
     setSigner(null);
     setTokenBalance(0n);
     setEthBalance(0n);
+    setConnectionError(null);
   }, []);
 
   const handleSwitchNetwork = useCallback(async () => {
+    setConnectionError(null);
     try {
       await switchChain(CHAIN_ID);
       if (provider) {
@@ -73,22 +88,50 @@ export function Web3Provider({ children }) {
       }
     } catch (err) {
       console.error('[Web3Context] Failed to switch network:', err);
+      let readable = 'Failed to switch network';
+      if (err.code === 4001 || err.message?.includes('rejected')) {
+        readable = 'Network switch request was rejected in MetaMask';
+      }
+      setConnectionError(readable);
     }
   }, [provider]);
 
-  // Handle MetaMask account and chain changes
+  // Eagerly check if wallet was previously connected
   useEffect(() => {
     if (!window.ethereum) return;
+
+    let isMounted = true;
+    const checkActiveConnection = async () => {
+      try {
+        const browserProvider = new ethers.BrowserProvider(window.ethereum);
+        const accounts = await browserProvider.send('eth_accounts', []);
+        if (accounts.length > 0 && isMounted) {
+          const network = await browserProvider.getNetwork();
+          const currentSigner = await browserProvider.getSigner();
+          const userAccount = ethers.getAddress(accounts[0]);
+          setAccount(userAccount);
+          setProvider(browserProvider);
+          setSigner(currentSigner);
+          setChainId(Number(network.chainId));
+          refreshBalances(userAccount, currentSigner);
+        }
+      } catch (err) {
+        console.warn('[Web3Context] Eager connection check failed:', err.message || err);
+      }
+    };
+
+    checkActiveConnection();
 
     const handleAccountsChanged = (accounts) => {
       if (accounts.length === 0) {
         disconnectWallet();
       } else {
-        setAccount(accounts[0]);
+        const newAccount = ethers.getAddress(accounts[0]);
+        setAccount(newAccount);
         if (provider) {
           provider.getSigner().then((newSigner) => {
             setSigner(newSigner);
-            refreshBalances(accounts[0], newSigner);
+            refreshBalances(newAccount, newSigner);
           });
         }
       }
@@ -96,17 +139,22 @@ export function Web3Provider({ children }) {
 
     const handleChainChanged = (hexChainId) => {
       setChainId(Number(hexChainId));
-      window.location.reload();
+      if (account && signer) {
+        refreshBalances(account, signer);
+      }
     };
 
     window.ethereum.on('accountsChanged', handleAccountsChanged);
     window.ethereum.on('chainChanged', handleChainChanged);
 
     return () => {
-      window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-      window.ethereum.removeListener('chainChanged', handleChainChanged);
+      isMounted = false;
+      if (window.ethereum.removeListener) {
+        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+        window.ethereum.removeListener('chainChanged', handleChainChanged);
+      }
     };
-  }, [provider, disconnectWallet, refreshBalances]);
+  }, [provider, account, signer, disconnectWallet, refreshBalances]);
 
   return (
     <Web3Context.Provider
@@ -115,10 +163,14 @@ export function Web3Provider({ children }) {
         provider,
         signer,
         chainId,
+        targetChainId: CHAIN_ID,
         isCorrectNetwork,
         isConnecting,
+        connectionError,
+        clearConnectionError: () => setConnectionError(null),
         tokenBalance,
         ethBalance,
+        contracts: CONTRACT_ADDRESSES,
         connectWallet,
         disconnectWallet,
         switchNetwork: handleSwitchNetwork,

@@ -13,7 +13,15 @@ import { Link } from 'react-router-dom';
 
 export default function Dashboard() {
   const { account, isConnecting, connectWallet } = useWallet();
-  const { score, limit, profile, loading: creditLoading, refresh: refreshCredit } = useCredit();
+  const {
+    score,
+    limit,
+    availableBorrowingPower,
+    outstandingPrincipal,
+    profile,
+    loading: creditLoading,
+    refresh: refreshCredit,
+  } = useCredit();
   const { fundLoan, repayLoan, status, txHash, error, reset, isPending } = useLoan();
 
   const [loans, setLoans] = useState([]);
@@ -102,7 +110,12 @@ export default function Dashboard() {
       {/* Primary Cards Grid: Score + Borrowing Power */}
       <div className="grid md:grid-cols-2 gap-6 mb-8">
         <CreditScoreCard score={score} loading={creditLoading} />
-        <BorrowingPowerCard limit={limit} loading={creditLoading} />
+        <BorrowingPowerCard
+          limit={limit}
+          availableBorrowingPower={availableBorrowingPower}
+          outstandingPrincipal={outstandingPrincipal}
+          loading={creditLoading}
+        />
       </div>
 
       {/* Profile Onchain Statistics */}
