@@ -117,3 +117,77 @@ ETHERSCAN_API_KEY=your_etherscan_api_key
 - `.env` files are tracked in `.gitignore` across the entire monorepo.
 - The deployer wallet remaining balance is `0.0456 ETH` (no mainnet funds were ever used or requested).
 - Contract code has been verified and matches the local audited repository byte-for-byte.
+
+---
+
+## 8. Target Production Architecture Topology
+
+For the final live production release, CrediFi deploys across managed cloud infrastructure:
+
+```
+[Borrowers & Lenders]
+        │
+        ▼
+   Vercel (Frontend: React 18 + Vite + Tailwind CSS + ethers.js)
+        │
+        ├──────────────────────────────┐
+        ▼                              ▼
+  Ethereum Sepolia               Render (Backend: Node.js + Express)
+  (Smart Contracts)                    │
+        │                              ▼
+        ▼                        MongoDB Atlas
+  Alchemy Webhooks ─────────────► (Managed Database Cluster)
+  (Sepolia Events)
+```
+
+- **Frontend Hosting**: **Vercel** (React SPA, Vite build, static CDN distribution).
+- **Backend Service**: **Render Web Service** (Node.js/Express, Docker/native runtime, CORS restricted).
+- **Database Engine**: **MongoDB Atlas** (Cloud hosted M0/serverless cluster, indexed and authenticated).
+- **Event Pipeline**: **Alchemy Custom Webhook** (Sepolia events) $\rightarrow$ Render endpoint (`POST /api/webhooks/alchemy`) $\rightarrow$ MongoDB Atlas.
+- **Smart Contracts**: **Ethereum Sepolia** (Verified immutable contracts, unchanged).
+
+---
+
+## 9. MongoDB Atlas Production Database Provisioning Guide
+
+Follow these steps to provision the cloud database cluster for CrediFi:
+
+1. **Create MongoDB Atlas Project**:
+   - Log into [MongoDB Cloud](https://cloud.mongodb.com).
+   - Create a new project named `CrediFi-Production`.
+
+2. **Create Database Deployment**:
+   - Click **Deploy a Database** and select **M0 (Free)** shared cluster.
+   - Select cloud provider **AWS** and region (e.g., `us-east-1` or closest to Render region `oregon`/`us-west`).
+   - Cluster Name: `credifi-cluster`.
+
+3. **Create Database User**:
+   - In **Security** $\rightarrow$ **Database Access**, click **Add New Database User**.
+   - Authentication Method: **Password**.
+   - Provide a strong username (e.g. `credifi-admin`) and generate a secure password.
+   - Built-in Role: **Read and write to any database** (or restrict to `credifi` database).
+
+4. **Configure Network Access**:
+   - In **Security** $\rightarrow$ **Network Access**, click **Add IP Address**.
+   - Select **Allow Access from Anywhere** (`0.0.0.0/0`) with description `Render Web Service dynamic outbound IPs`.
+   - Atlas utilizes TLS encryption by default for all incoming connections.
+
+5. **Obtain Connection String**:
+   - In **Deployment** $\rightarrow$ **Database**, click **Connect**.
+   - Choose **Drivers** (Node.js version 5.5 or later).
+   - Copy the SRV connection URI format.
+
+6. **Format Database Name in URI**:
+   - Ensure the database name `credifi` is appended before query parameters:
+     ```text
+     mongodb+srv://<username>:<password>@<cluster>.mongodb.net/credifi?retryWrites=true&w=majority
+     ```
+
+7. **Store in Render Environment Configuration**:
+   - Navigate to your Render Web Service dashboard.
+   - Add the secret environment variable:
+     - **Key**: `MONGODB_URI`
+     - **Value**: `mongodb+srv://<username>:<password>@<cluster>.mongodb.net/credifi?retryWrites=true&w=majority`
+   - *Never commit real database credentials or URI strings into version control.*
+
+

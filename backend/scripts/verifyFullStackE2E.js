@@ -105,8 +105,9 @@ async function main() {
   console.log(' CrediFi — Full-Stack End-to-End Verification (Phase 15)');
   console.log('====================================================\n');
 
-  const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/credifi';
-  console.log(`[Database] Connecting to MongoDB: ${mongoUri}`);
+  const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/credifi';
+  const maskedUri = mongoUri.replace(/:([^:@]+)@/, ':****@');
+  console.log(`[Database] Connecting to MongoDB: ${maskedUri}`);
 
   try {
     if (mongoose.connection.readyState !== 1) {

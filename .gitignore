@@ -7,20 +7,21 @@ pnpm-debug.log*
 
 # Environment and Secrets (NEVER COMMIT SENSITIVE SECRETS)
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
 
 # Hardhat & Solidity
 cache/
 artifacts/
 typechain/
 typechain-types/
+coverage/
+coverage.json
 
 # Vite & Frontend build
 dist/
 dist-ssr/
+build/
 *.local
 
 # Logs and databases
@@ -28,8 +29,13 @@ logs
 *.log
 *.sqlite
 
+# Cache and temp directories
+.cache/
+.tmp/
+
 # OS and Editor files
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+

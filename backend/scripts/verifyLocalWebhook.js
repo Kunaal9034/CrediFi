@@ -76,8 +76,9 @@ async function main() {
   console.log(' CrediFi Phase 13 — Local Webhook Verification');
   console.log('====================================================\n');
 
-  const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/credifi';
-  console.log(`Connecting to MongoDB at: ${mongoUri}`);
+  const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/credifi';
+  const maskedUri = mongoUri.replace(/:([^:@]+)@/, ':****@');
+  console.log(`Connecting to MongoDB at: ${maskedUri}`);
   if (mongoose.connection.readyState !== 1) {
     await mongoose.connect(mongoUri);
   }

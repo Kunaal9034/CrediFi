@@ -20,6 +20,7 @@ const HOST = '0.0.0.0';
 // Configurable CORS for Vercel production + localhost development
 const allowedOrigins = [
   process.env.FRONTEND_URL,
+  process.env.CLIENT_ORIGIN,
   process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
   'http://localhost:5173',
   'http://localhost:3000',
@@ -119,25 +120,95 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message || 'Internal server error' });
 });
 
+// Environment validation for production safety
+function validateEnvironment() {
+  if (process.env.NODE_ENV === 'production') {
+    const requiredVars = [
+      'MONGODB_URI',
+      'SEPOLIA_RPC_URL',
+      'CHAIN_ID',
+      'MOCK_USDC_ADDRESS',
+      'CREDIT_REGISTRY_ADDRESS',
+      'LENDING_POOL_ADDRESS',
+      'LOAN_MANAGER_ADDRESS',
+      'ALCHEMY_WEBHOOK_SIGNING_KEY',
+    ];
+    const missing = requiredVars.filter((key) => {
+      if (key === 'MONGODB_URI') {
+        return !process.env.MONGODB_URI && !process.env.MONGO_URI;
+      }
+      return !process.env[key];
+    });
+    if (missing.length > 0) {
+      missing.forEach((key) => {
+        console.error(`[CrediFi Config Error] ${key} is not configured.`);
+      });
+      process.exit(1);
+    }
+  }
+}
+
 // MongoDB Connection (supports standard Atlas MONGODB_URI and legacy MONGO_URI)
 const MONGO_CONNECTION_STRING = process.env.MONGODB_URI || process.env.MONGO_URI;
 
+// Connection options optimized for MongoDB Atlas and connection pooling
+const MONGO_OPTIONS = {
+  maxPoolSize: 10,
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,
+};
+
 if (MONGO_CONNECTION_STRING && process.env.NODE_ENV !== 'test') {
   mongoose
-    .connect(MONGO_CONNECTION_STRING, {
-      serverSelectionTimeoutMS: 5000,
-    })
+    .connect(MONGO_CONNECTION_STRING, MONGO_OPTIONS)
     .then(() => {
       console.log('[CrediFi Backend] Connected to MongoDB cache');
     })
     .catch((err) => {
-      console.warn('[CrediFi Backend] MongoDB connection failed (running in cache-degraded mode):', err.message);
+      if (process.env.NODE_ENV === 'production') {
+        console.error('[CrediFi Backend] CRITICAL: Failed to connect to MongoDB Atlas:', err.message);
+        process.exit(1);
+      } else {
+        console.warn('[CrediFi Backend] MongoDB connection failed (running in cache-degraded mode):', err.message);
+      }
     });
+
+  mongoose.connection.on('error', (err) => {
+    console.error('[CrediFi Backend] MongoDB runtime error:', err.message);
+  });
+  mongoose.connection.on('disconnected', () => {
+    console.warn('[CrediFi Backend] MongoDB disconnected');
+  });
 }
+
+// Graceful Shutdown Handlers
+let serverInstance = null;
+
+const gracefulShutdown = async (signal) => {
+  console.log(`[CrediFi Backend] Received ${signal}. Initiating graceful shutdown...`);
+  if (serverInstance) {
+    serverInstance.close(() => {
+      console.log('[CrediFi Backend] HTTP server closed.');
+    });
+  }
+  if (mongoose.connection.readyState === 1) {
+    try {
+      await mongoose.connection.close(false);
+      console.log('[CrediFi Backend] MongoDB connection closed.');
+    } catch (err) {
+      console.error('[CrediFi Backend] Error closing MongoDB connection:', err.message);
+    }
+  }
+  process.exit(0);
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Start Server if executed directly (binds explicitly to 0.0.0.0 for Render)
 if (require.main === module) {
-  app.listen(PORT, HOST, () => {
+  validateEnvironment();
+  serverInstance = app.listen(PORT, HOST, () => {
     console.log(`[CrediFi Backend] Server running on ${HOST}:${PORT}`);
     console.log(`[CrediFi Backend] Health check: http://${HOST}:${PORT}/api/health`);
     console.log(`[CrediFi Backend] Alchemy webhook: http://${HOST}:${PORT}/api/webhooks/alchemy`);
