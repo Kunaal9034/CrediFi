@@ -253,3 +253,47 @@ export async function fetchUserLoansOnchain(account, runner) {
     return [];
   }
 }
+
+/**
+ * Scan all open REQUESTED loans directly from LoanManager on Sepolia
+ */
+export async function fetchMarketplaceLoansOnchain(runner) {
+  try {
+    const loanManager = getContract('loanManager', runner);
+    if (!loanManager) return [];
+    const count = await loanManager.loanCounter();
+    const totalCount = Number(count);
+    const marketplaceLoans = [];
+
+    for (let i = 1; i <= totalCount; i++) {
+      try {
+        const loan = await loanManager.getLoan(i);
+        if (Number(loan.status) === 0) {
+          marketplaceLoans.push(normalizeLoan(loan));
+        }
+      } catch (innerErr) {
+        console.warn(`[blockchain.js] Skipping marketplace loan #${i}:`, innerErr.message);
+      }
+    }
+    return marketplaceLoans.reverse();
+  } catch (err) {
+    console.error('[blockchain.js] Failed to fetch marketplace loans onchain:', err);
+    return [];
+  }
+}
+
+/**
+ * Check ERC20 token allowance
+ */
+export async function checkAllowance(tokenName, owner, spender, runner) {
+  if (!owner || !spender) return 0n;
+  try {
+    const token = getContract(tokenName, runner);
+    if (!token) return 0n;
+    return await token.allowance(owner, spender);
+  } catch (err) {
+    console.error(`[blockchain.js] Failed to check allowance for ${tokenName}:`, err);
+    return 0n;
+  }
+}
+

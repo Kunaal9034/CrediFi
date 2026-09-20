@@ -36,13 +36,19 @@ export default function LoanCard({
         <div className="grid grid-cols-2 gap-2 my-4 p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 text-xs">
           <div className="flex items-center space-x-1.5 text-slate-400">
             <Percent size={13} className="text-cyan-400" />
-            <span>APR: <strong className="text-slate-200">{formatAPR(loan.interestRate)}</strong></span>
+            <span>APR: <strong className="text-slate-200">{formatAPR(loan.interestRateBps || loan.interestRate)}</strong></span>
           </div>
           <div className="flex items-center space-x-1.5 text-slate-400">
             <Clock size={13} className="text-blue-400" />
             <span>Term: <strong className="text-slate-200">{formatDurationDays(loan.duration)}</strong></span>
           </div>
-          <div className="col-span-2 flex items-center space-x-1.5 text-slate-400 truncate pt-1 border-t border-slate-800">
+          {loan.totalDue && (
+            <div className="col-span-2 flex items-center justify-between text-slate-400 pt-1 border-t border-slate-800/60">
+              <span>Total Return:</span>
+              <span className="font-mono text-emerald-400 font-semibold">${formatUSDC(loan.totalDue)} mUSDC</span>
+            </div>
+          )}
+          <div className="col-span-2 flex items-center space-x-1.5 text-slate-400 truncate pt-1 border-t border-slate-800/60">
             <User size={13} className="text-slate-500" />
             <span>Borrower: <strong className="text-slate-300 font-mono">{formatAddress(loan.borrower)}</strong></span>
           </div>
