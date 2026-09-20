@@ -118,12 +118,37 @@ LoanManager (Protocol Orchestrator)
      - Protocol contract configurations restricted to `onlyOwner`.
 
 4. **`LendingPool.sol`**:
-   - Handles actual token movement.
-   - Protected with OpenZeppelin `SafeERC20` and `ReentrancyGuard`.
-   - Mutation functions restricted to `onlyLoanManager`:
-     - `transferFunds(address lender, address borrower, uint256 amount)`
-     - `executeRepayment(address borrower, address lender, uint256 totalDue)`
-   - Does **not** independently determine loan lifecycle state.
+   - Protocol Token Movement & Custody Layer for CrediFi.
+   - **Separation of Concerns:** LendingPool does **NOT** own protocol financial policy. `LoanManager` owns all loan state, lifecycle rules, interest formulas, and credit scoring integration. LendingPool is strictly an authorized token transfer executor.
+   - **Token Movement Model:**
+     - Uses OpenZeppelin `SafeERC20 for IERC20`.
+     - Direct `safeTransferFrom` execution: tokens transfer directly between counterparties (`Lender -> Borrower` upon funding; `Borrower -> Lender` upon repayment) without requiring permanent pool custody or residual balances.
+   - **Access Control:**
+     - Protected by `onlyLoanManager` modifier: only the configured `LoanManager` address can call protocol transfer functions.
+     - Unauthorized callers, lenders, borrowers, or arbitrary users attempting direct invocation strictly revert.
+     - Admin address configuration (`setLoanManager`, `setToken`) is restricted strictly to contract `owner` (`onlyOwner`), and rejects zero addresses.
+   - **Reentrancy Protection:**
+     - Inherits OpenZeppelin `ReentrancyGuard`.
+     - `transferFunds` and `executeRepayment` are protected by `nonReentrant`.
+   - **Funding Flow:**
+     1. Lender approves `LendingPool` directly: `MockUSDC.approve(LendingPool, principal)`.
+     2. Lender invokes `LoanManager.fundLoan(loanId)`.
+     3. `LoanManager` transitions loan to `ACTIVE` and calls `LendingPool.transferFunds(lender, borrower, principal)`.
+     4. `LendingPool` executes `token.safeTransferFrom(lender, borrower, principal)`.
+     5. Emits `FundsTransferred(lender, borrower, principal)` and `FundsDisbursed(lender, borrower, principal)`.
+   - **Repayment Flow:**
+     1. Borrower approves `LendingPool` directly: `MockUSDC.approve(LendingPool, totalDue)`.
+     2. Borrower invokes `LoanManager.repayLoan(loanId)`.
+     3. `LoanManager` validates repayment timing, transitions loan to `REPAID`, and calls `LendingPool.executeRepayment(borrower, lender, totalDue)`.
+     4. `LendingPool` executes `token.safeTransferFrom(borrower, lender, totalDue)`.
+     5. Emits `RepaymentExecuted(borrower, lender, totalDue)` and `RepaymentTransferred(borrower, lender, totalDue)`.
+   - **Security Invariants & Non-Responsibilities:**
+     - Only `LoanManager` can initiate transfers.
+     - Zero lender or borrower addresses are rejected.
+     - Zero amounts are rejected.
+     - Self-funding (`lender == borrower`) and self-repayment (`borrower == lender`) are rejected.
+     - Zero collateral: no collateral deposits, no collateral withdrawals, no liquidation, no liquidation auctions, no LTV ratios, no price oracles.
+     - Contains no loan state, no interest calculation, no credit scoring, and no offchain database logic.
 
 5. **Financial Mechanism Classification:**
    - **Model A: Credit-Based Unsecured Lending (Zero Collateral)**.

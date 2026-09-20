@@ -8,33 +8,47 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title LendingPool
- * @notice Secure token movement layer for CrediFi (Hack in Hills '26).
- * @dev Handles custody and transfer of MockUSDC between lenders and borrowers.
- *      Does NOT decide loan lifecycle states; all actions are triggered by LoanManager.
+ * @notice Protocol Token Movement & Custody Layer for CrediFi (Hack in Hills '26).
+ * @dev Handles secure transfers of MockUSDC between lenders and borrowers.
+ *      Mutation functions are strictly restricted to the authorized LoanManager contract.
+ *      Does NOT determine credit scores, loan lifecycle, interest, or collateral.
  */
 contract LendingPool is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    IERC20 public immutable token;
+    IERC20 public token;
     address public loanManager;
 
-    event LoanManagerUpdated(address indexed previousManager, address indexed newManager);
+    // Events
+    event FundsTransferred(address indexed lender, address indexed borrower, uint256 amount);
     event FundsDisbursed(address indexed lender, address indexed borrower, uint256 amount);
-    event RepaymentTransferred(address indexed borrower, address indexed lender, uint256 totalDue);
+    event RepaymentExecuted(address indexed borrower, address indexed lender, uint256 amount);
+    event RepaymentTransferred(address indexed borrower, address indexed lender, uint256 amount);
+    event LoanManagerUpdated(address indexed previousManager, address indexed newManager);
+    event TokenUpdated(address indexed previousToken, address indexed newToken);
 
     modifier onlyLoanManager() {
         require(msg.sender == loanManager, "LendingPool: Caller is not authorized LoanManager");
         _;
     }
 
-    constructor(address _token, address initialOwner) Ownable(initialOwner) {
+    /**
+     * @notice Initializes LendingPool with token and LoanManager addresses
+     * @param _token Address of ERC20 token (MockUSDC)
+     * @param _loanManager Address of authorized LoanManager contract
+     */
+    constructor(address _token, address _loanManager) Ownable(msg.sender) {
         require(_token != address(0), "LendingPool: Invalid token address");
+        require(_loanManager != address(0), "LendingPool: Invalid LoanManager address");
+
         token = IERC20(_token);
+        loanManager = _loanManager;
     }
 
     /**
      * @notice Set or update the authorized LoanManager contract
-     * @param _loanManager Address of the deployed LoanManager contract
+     * @dev Restricted strictly to owner
+     * @param _loanManager Address of deployed LoanManager contract
      */
     function setLoanManager(address _loanManager) external onlyOwner {
         require(_loanManager != address(0), "LendingPool: Invalid LoanManager address");
@@ -44,10 +58,22 @@ contract LendingPool is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Disburses loan funds from Lender to Borrower upon loan funding
-     * @dev Called only by LoanManager when state transitions from REQUESTED -> ACTIVE
+     * @notice Set or update the underlying token address
+     * @dev Restricted strictly to owner
+     * @param _token Address of new ERC20 token contract
+     */
+    function setToken(address _token) external onlyOwner {
+        require(_token != address(0), "LendingPool: Invalid token address");
+        address prev = address(token);
+        token = IERC20(_token);
+        emit TokenUpdated(prev, _token);
+    }
+
+    /**
+     * @notice Transfers loan principal from Lender to Borrower upon loan funding
+     * @dev Called exclusively by LoanManager during fundLoan()
      * @param lender The lender providing liquidity
-     * @param borrower The borrower receiving the principal
+     * @param borrower The borrower receiving principal
      * @param amount The principal amount to disburse
      */
     function transferFunds(
@@ -57,20 +83,21 @@ contract LendingPool is Ownable, ReentrancyGuard {
     ) external onlyLoanManager nonReentrant {
         require(lender != address(0), "LendingPool: Invalid lender");
         require(borrower != address(0), "LendingPool: Invalid borrower");
+        require(lender != borrower, "LendingPool: Lender cannot be borrower");
         require(amount > 0, "LendingPool: Amount must be greater than zero");
 
-        // Transfer MockUSDC: Lender -> LendingPool -> Borrower
-        token.safeTransferFrom(lender, address(this), amount);
-        token.safeTransfer(borrower, amount);
+        // Direct transfer from Lender to Borrower using SafeERC20
+        token.safeTransferFrom(lender, borrower, amount);
 
+        emit FundsTransferred(lender, borrower, amount);
         emit FundsDisbursed(lender, borrower, amount);
     }
 
     /**
      * @notice Executes repayment transfer from Borrower to Lender
-     * @dev Called only by LoanManager when state transitions from ACTIVE -> REPAID
-     * @param borrower The borrower making the repayment
-     * @param lender The lender receiving the principal + interest
+     * @dev Called exclusively by LoanManager during repayLoan()
+     * @param borrower The borrower making repayment
+     * @param lender The lender receiving principal + interest
      * @param totalDue The total debt obligation
      */
     function executeRepayment(
@@ -80,12 +107,13 @@ contract LendingPool is Ownable, ReentrancyGuard {
     ) external onlyLoanManager nonReentrant {
         require(borrower != address(0), "LendingPool: Invalid borrower");
         require(lender != address(0), "LendingPool: Invalid lender");
+        require(borrower != lender, "LendingPool: Borrower cannot be lender");
         require(totalDue > 0, "LendingPool: Repayment must be greater than zero");
 
-        // Transfer MockUSDC: Borrower -> LendingPool -> Lender
-        token.safeTransferFrom(borrower, address(this), totalDue);
-        token.safeTransfer(lender, totalDue);
+        // Direct transfer from Borrower to Lender using SafeERC20
+        token.safeTransferFrom(borrower, lender, totalDue);
 
+        emit RepaymentExecuted(borrower, lender, totalDue);
         emit RepaymentTransferred(borrower, lender, totalDue);
     }
 }
