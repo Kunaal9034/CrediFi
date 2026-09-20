@@ -1,7 +1,7 @@
 // Export deployed smart contract addresses for Ethereum Sepolia (Chain ID 11155111)
 // Sourced directly from contracts/deployments/sepolia.json
 
-export const CHAIN_ID = 11155111;
+export const CHAIN_ID = Number(import.meta.env.VITE_CHAIN_ID) || 11155111;
 
 export const CONTRACT_ADDRESSES = {
   mockUSDC: import.meta.env.VITE_MOCK_USDC_ADDRESS || "0xfaaF91778853F35FB7Db545dc3586aFc354103d0",
