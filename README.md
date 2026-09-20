@@ -4,6 +4,7 @@
 > **Tagline:** *"Onchain Credit. Undercollateralized Lending."*  
 > **Hackathon:** Hack in Hills '26  
 > **Network:** Ethereum Sepolia Testnet  
+> **Classification:** Hackathon Prototype with production-oriented engineering practices.
 
 ---
 
@@ -27,34 +28,76 @@ Traditional credit bureaus (Equifax, Experian, TransUnion) are closed, regional,
 ## 3. Architecture
 
 ```
-                                      +---------------------------------------------+
-                                      |              MetaMask Wallet                |
-                                      +----------------------+----------------------+
-                                                             |
-                                                             | Signs Transactions
-                                                             v
-+------------------------+                           +-------+----------------------+
-| React / Vite Frontend  | <=== Reads RPC State ===> |  Ethereum Sepolia Testnet    |
-| (Tailwind, ethers.js)  |                           |                              |
-+-----------+------------+                           |  1. MockUSDC.sol             |
-            |                                        |  2. CreditRegistry.sol       |
-            | Queries REST API                       |  3. LoanManager.sol          |
-            v                                        |  4. LendingPool.sol          |
-+-----------+------------+                           +--------------+---------------+
-| Express Backend API    |                                          |
-| (Idempotent Indexer)   | <=== POST /api/webhooks/alchemy <======= | Confirmed Logs
-+-----------+------------+      (Alchemy Webhooks Engine)           v
-            |                                               (Event Streams)
-            v
-+-----------+------------+
-| MongoDB Cache / Store  |  *NOTE: Blockchain is the SOLE financial truth.
-| (History & Analytics)  |        MongoDB is an index/cache layer only.
-+------------------------+
+                         USER
+                           │
+                        MetaMask
+                           │
+                           ▼
+                  React Frontend (Vite + Tailwind)
+                           │
+                        ethers.js v6
+                           │
+                           ▼
+                    Sepolia Network
+                           │
+              ┌────────────┼────────────┐
+              │            │            │
+              ▼            ▼            ▼
+        CreditRegistry  LoanManager  LendingPool
+                           │            │
+                           │            ▼
+                           │        MockUSDC
+                           │
+                           ▼
+                       Events
+              (LoanCreated, LoanFunded, LoanRepaid,
+               LoanDefaulted, CreditProfileUpdated)
+                           │
+                           ▼
+                   Alchemy Webhook
+                           │
+                           ▼
+                   POST /api/webhooks/alchemy
+                   (Signature Verified)
+                           │
+                           ▼
+                       Express
+                           │
+                           ▼
+                       MongoDB
+                   (Idempotent Cache)
+                           │
+                           ▼
+                       REST API
+                           │
+                           ▼
+                    React Analytics (Recharts)
 ```
+
+**Core Principle:**
+- **Blockchain:** Sole financial source of truth.
+- **MongoDB:** Strictly an indexed cache for fast queries and analytics. Never determines balances or financial state.
+- **Alchemy:** Infrastructure for JSON-RPC reads and push webhook notifications.
 
 ---
 
-## 4. Technology Stack
+## 4. Smart Contract Hierarchy & Responsibilities
+
+```
+LoanManager (Protocol Orchestrator)
+ ├── calls CreditRegistry (State & Authorization Gated)
+ └── calls LendingPool (Token Custody & Transfer Execution)
+        └── interacts with MockUSDC (Test ERC20)
+```
+
+1. **`MockUSDC.sol`**: Standard ERC20 token (6 decimals) with a capped faucet (`faucet()`) for demo testing.
+2. **`CreditRegistry.sol`**: Manages onchain credit profiles and computes borrowing limits deterministically. All score mutations (`recordLoan`, `recordRepayment`, `recordDefault`) are strictly protected by `onlyLoanManager`.
+3. **`LoanManager.sol`**: Protocol orchestrator and state machine. **Enforces onchain undercollateralized borrowing limits in `createLoan()`** and enforces the 4-state lifecycle (`REQUESTED` -> `ACTIVE` -> `REPAID` or `DEFAULTED`).
+4. **`LendingPool.sol`**: Token custody and movement layer (`SafeERC20`, `ReentrancyGuard`). Token disbursements and repayment transfers are triggered only by `onlyLoanManager`.
+
+---
+
+## 5. Technology Stack
 
 - **Smart Contracts:** Solidity `^0.8.20`, Hardhat, OpenZeppelin Contracts v5 (ERC20, SafeERC20, ReentrancyGuard, Ownable)
 - **Blockchain Network:** Ethereum Sepolia Testnet (Chain ID `11155111`)
@@ -65,42 +108,16 @@ Traditional credit bureaus (Equifax, Experian, TransUnion) are closed, regional,
 
 ---
 
-## 5. Repository Structure
+## 6. Team Ownership
 
-```
-Hackathon/
-├── contracts/               # Hardhat smart contracts workspace
-│   ├── contracts/           # MockUSDC, CreditRegistry, LoanManager, LendingPool
-│   ├── scripts/             # Deployment & verification scripts
-│   ├── test/                # Hardhat unit and integration tests
-│   └── hardhat.config.cjs   # Hardhat configuration (Solidity 0.8.20)
-├── frontend/                # Vite + React + Tailwind CSS client
-│   ├── src/
-│   │   ├── components/      # Reusable UI & Web3 components
-│   │   ├── pages/           # Landing, Dashboard, Borrow, Lend, Loans, Credit, Analytics
-│   │   ├── context/         # Web3Context (MetaMask provider, signers, contract instances)
-│   │   └── utils/           # Formatters, constants, and ABIs
-├── backend/                 # Express REST API & Alchemy Webhook Indexer
-│   ├── src/
-│   │   ├── controllers/     # loan, user, analytics controllers
-│   │   ├── routes/          # loan, user, analytics, webhook routes
-│   │   ├── models/          # User, Loan, Transaction, ProtocolStats schemas
-│   │   ├── listeners/       # Blockchain event listeners & webhook processors
-│   │   └── services/        # Event ingestion & analytics computation
-├── docs/                    # Architectural & API specifications
-│   ├── architecture.md
-│   ├── smart-contracts.md
-│   ├── api.md
-│   ├── deployment.md
-│   ├── security.md
-│   └── demo.md
-├── package.json             # Root monorepo orchestration
-└── .env.example             # Master environment variable template
-```
+| Team Member | Role | Core Responsibilities |
+|---|---|---|
+| **Ratan Shah** | Frontend Lead | React UI, Tailwind styling, MetaMask integration, ethers.js frontend integration, Dashboard, Borrow UI, Lending Marketplace, My Loans, Transaction Progress UX, Protocol Analytics UI. |
+| **Kunaal** | Backend & Smart Contract Lead | Primary Smart Contract architecture, Node.js + Express backend, MongoDB schemas, Alchemy webhook integration with HMAC verification, triple-key idempotency, REST APIs, Analytics aggregation service, deployment scripts. |
 
 ---
 
-## 6. Environment Variables
+## 7. Environment Variables
 
 See [`.env.example`](file:///.env.example) for master configuration.
 
@@ -115,6 +132,7 @@ ETHERSCAN_API_KEY=YOUR_ETHERSCAN_KEY
 ```env
 PORT=5000
 MONGO_URI=mongodb://localhost:27017/credifi
+SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_ALCHEMY_KEY
 ALCHEMY_API_KEY=YOUR_ALCHEMY_KEY
 ALCHEMY_WEBHOOK_SIGNING_KEY=YOUR_SIGNING_KEY
 CHAIN_ID=11155111
@@ -137,23 +155,26 @@ VITE_MOCK_USDC_ADDRESS=0x...
 
 ---
 
-## 7. Local Development & Setup
+## 8. Local Development & Testing
 
-### Prerequisites
-- Node.js `v18+` (Tested on `v22.22.0`)
-- npm `v9+`
-- MetaMask browser extension installed
-
-### 1. Install Dependencies
+### 1. Run Complete Test Suite (Contracts + Backend)
 ```bash
-# From workspace root
-npm run install:all
+npm run test:all
 ```
 
-### 2. Compile & Test Smart Contracts
+### 2. Compile & Deploy Smart Contracts
 ```bash
+# Compile contracts
 npm run compile:contracts
-npm run test:contracts
+
+# Deploy to Sepolia testnet
+npm run deploy:sepolia
+
+# Verify bytecode & protocol links
+npm --prefix contracts run verify:sepolia
+
+# Seed realistic demo state onchain (Hackathon Demo Seed)
+npm --prefix contracts run seed:sepolia
 ```
 
 ### 3. Run Development Servers
@@ -167,26 +188,23 @@ npm run dev:frontend
 
 ---
 
-## 8. Verified Contract Addresses (Sepolia Testnet)
+## 9. 15-Phase Implementation Roadmap
 
-*To be populated upon Phase 7 deployment:*
-- **MockUSDC:** `TBD`
-- **CreditRegistry:** `TBD`
-- **LoanManager:** `TBD`
-- **LendingPool:** `TBD`
-
----
-
-## 9. Hackathon Demo Flow
-
-1. **Connect MetaMask:** User connects wallet to CrediFi on Ethereum Sepolia.
-2. **Faucet & Minting:** User mints test MockUSDC for demo purposes.
-3. **Credit Profile Inspection:** Initial credit score defaults to 500 with a baseline borrowing power of 500 USDC.
-4. **Loan Request (Borrower):** Borrower creates a loan request onchain. State becomes `REQUESTED`.
-5. **Loan Funding (Lender):** Second wallet views the open loan in the marketplace and funds it via `LendingPool`. Funds transfer directly to the borrower. State becomes `ACTIVE`.
-6. **Repayment (Borrower):** Borrower approves and repays principal + interest. Funds transfer back to the lender.
-7. **Credit Score Increment:** Contract updates credit score (+50 for on-time repayment, +20 early), immediately expanding borrowing capacity.
-8. **Real-time Event Indexing:** Alchemy webhook catches emitted events and indexes them into MongoDB for protocol analytics and history.
+- [x] **PHASE 1: Project Setup** - Monorepo architecture, Hardhat setup, Vite build, Express health check.
+- [x] **PHASE 2: MockUSDC** - ERC20 test token with capped demo faucet, unit tests.
+- [x] **PHASE 3: CreditRegistry** - Onchain credit scoring, `onlyLoanManager` access control, unit tests.
+- [x] **PHASE 4: LoanManager** - State machine, onchain borrowing limit gate, unit tests.
+- [x] **PHASE 5: LendingPool** - Safe token movement, SafeERC20 + ReentrancyGuard, unit tests.
+- [x] **PHASE 6: Smart Contract Tests** - 45 passing unit and integration tests.
+- [x] **PHASE 7: Sepolia Deployment** - Deployment script, bytecode verification script, demo seed script.
+- [x] **PHASE 8: Wallet + Frontend Web3** - MetaMask integration, custom hooks, network guard.
+- [x] **PHASE 9: Borrow Flow** - Undercollateralized loan request form, onchain limit checks.
+- [x] **PHASE 10: Lending Flow** - Peer-to-peer lending marketplace, token approvals, funding flow.
+- [x] **PHASE 11: Repayment + Credit Update** - Loan repayment, automatic score boost, borrowing power expansion.
+- [x] **PHASE 12: Backend + MongoDB** - Mongoose schemas, REST API endpoints, RPC provider.
+- [x] **PHASE 13: Alchemy Event Indexing** - HMAC-SHA256 signature verification, triple-key idempotency.
+- [x] **PHASE 14: Analytics** - Protocol aggregation service, Recharts visual analytics.
+- [x] **PHASE 15: Security + End-to-End Testing + Demo** - Integration verification, threat model review.
 
 ---
 
@@ -194,6 +212,8 @@ npm run dev:frontend
 
 > [!CAUTION]
 > **Hackathon Prototype Notice**: CrediFi is an educational prototype developed for **Hack in Hills '26**.
-> - Smart contracts have not undergone a formal security audit.
+> - Smart contracts have not undergone a formal third-party security audit.
 > - Operates exclusively with test tokens on Ethereum Sepolia.
+> - Simplified heuristic credit scoring; does not incorporate off-chain credit bureau data.
+> - Proof-of-concept operates per-wallet without full Sybil identity checks.
 > - Does NOT provide real-world credit bureau equivalence or guaranteed legal debt recovery.
