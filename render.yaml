@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: credifi-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    plan: free
+    region: oregon
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: CHAIN_ID
+        value: 11155111
+      - key: MOCK_USDC_ADDRESS
+        value: 0xfaaF91778853F35FB7Db545dc3586aFc354103d0
+      - key: CREDIT_REGISTRY_ADDRESS
+        value: 0x9b117D9528c43Fb2938e43172b1935f38F2C6f90
+      - key: LENDING_POOL_ADDRESS
+        value: 0x6c7540f597E70b983A19b3e9372d9cdDB062e4F5
+      - key: LOAN_MANAGER_ADDRESS
+        value: 0x21b39401646D783690E3902C90963c711Ff7cC1C
+      - key: MONGODB_URI
+        sync: false
+      - key: SEPOLIA_RPC_URL
+        sync: false
+      - key: ALCHEMY_API_KEY
+        sync: false
+      - key: ALCHEMY_WEBHOOK_SIGNING_KEY
+        sync: false
+      - key: ADMIN_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        sync: false

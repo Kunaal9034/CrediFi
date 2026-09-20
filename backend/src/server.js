@@ -5,6 +5,7 @@ const morgan = require('morgan');
 const mongoose = require('mongoose');
 require('dotenv').config();
 
+const rateLimit = require('express-rate-limit');
 const loanRoutes = require('./routes/loanRoutes');
 const userRoutes = require('./routes/userRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
@@ -14,10 +15,46 @@ const userController = require('./controllers/userController');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const HOST = '0.0.0.0';
+
+// Configurable CORS for Vercel production + localhost development
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173',
+].filter(Boolean);
 
 // Security & Utility Middleware
 app.use(helmet());
-app.use(cors({ origin: true, credentials: true }));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. mobile apps, curl, Alchemy webhooks, server-to-server)
+      if (!origin) return callback(null, true);
+      if (
+        process.env.NODE_ENV !== 'production' ||
+        allowedOrigins.includes(origin) ||
+        /\.vercel\.app$/.test(origin)
+      ) {
+        return callback(null, true);
+      }
+      callback(new Error(`Origin ${origin} not allowed by CORS policy`));
+    },
+    credentials: true,
+  })
+);
+
+// General Rate Limiter for public APIs
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 500, // Generous limit for UI dashboard & polling
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+});
+app.use('/api/', apiLimiter);
 
 // For webhooks: preserve untouched raw body Buffer for HMAC-SHA256 signature verification
 app.use('/api/webhooks', express.raw({ type: '*/*', limit: '10mb' }));
@@ -71,7 +108,6 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/admin', adminRoutes);
 
-
 // 404 Handler
 app.use((req, res) => {
   res.status(404).json({ error: 'Endpoint not found' });
@@ -80,13 +116,17 @@ app.use((req, res) => {
 // Global Error Handler
 app.use((err, req, res, next) => {
   console.error('[Server Error]:', err);
-  res.status(500).json({ error: 'Internal server error' });
+  res.status(500).json({ error: err.message || 'Internal server error' });
 });
 
-// MongoDB Connection
-if (process.env.MONGO_URI && process.env.NODE_ENV !== 'test') {
+// MongoDB Connection (supports standard Atlas MONGODB_URI and legacy MONGO_URI)
+const MONGO_CONNECTION_STRING = process.env.MONGODB_URI || process.env.MONGO_URI;
+
+if (MONGO_CONNECTION_STRING && process.env.NODE_ENV !== 'test') {
   mongoose
-    .connect(process.env.MONGO_URI)
+    .connect(MONGO_CONNECTION_STRING, {
+      serverSelectionTimeoutMS: 5000,
+    })
     .then(() => {
       console.log('[CrediFi Backend] Connected to MongoDB cache');
     })
@@ -95,12 +135,12 @@ if (process.env.MONGO_URI && process.env.NODE_ENV !== 'test') {
     });
 }
 
-// Start Server if executed directly
+// Start Server if executed directly (binds explicitly to 0.0.0.0 for Render)
 if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`[CrediFi Backend] Server running on port ${PORT}`);
-    console.log(`[CrediFi Backend] Health check: http://localhost:${PORT}/api/health`);
-    console.log(`[CrediFi Backend] Alchemy webhook: http://localhost:${PORT}/api/webhooks/alchemy`);
+  app.listen(PORT, HOST, () => {
+    console.log(`[CrediFi Backend] Server running on ${HOST}:${PORT}`);
+    console.log(`[CrediFi Backend] Health check: http://${HOST}:${PORT}/api/health`);
+    console.log(`[CrediFi Backend] Alchemy webhook: http://${HOST}:${PORT}/api/webhooks/alchemy`);
   });
 }
 

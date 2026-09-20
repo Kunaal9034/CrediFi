@@ -4,12 +4,12 @@ require('dotenv').config();
 const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL || 'https://rpc.sepolia.org';
 const provider = new ethers.JsonRpcProvider(SEPOLIA_RPC_URL);
 
-// Contract Addresses
+// Contract Addresses (with Sepolia deployment defaults)
 const ADDRESSES = {
-  creditRegistry: process.env.CREDIT_REGISTRY_ADDRESS || '',
-  loanManager: process.env.LOAN_MANAGER_ADDRESS || '',
-  lendingPool: process.env.LENDING_POOL_ADDRESS || '',
-  mockUSDC: process.env.MOCK_USDC_ADDRESS || '',
+  creditRegistry: (process.env.CREDIT_REGISTRY_ADDRESS || '0x9b117D9528c43Fb2938e43172b1935f38F2C6f90').toLowerCase(),
+  loanManager: (process.env.LOAN_MANAGER_ADDRESS || '0x21b39401646D783690E3902C90963c711Ff7cC1C').toLowerCase(),
+  lendingPool: (process.env.LENDING_POOL_ADDRESS || '0x6c7540f597E70b983A19b3e9372d9cdDB062e4F5').toLowerCase(),
+  mockUSDC: (process.env.MOCK_USDC_ADDRESS || '0xfaaF91778853F35FB7Db545dc3586aFc354103d0').toLowerCase(),
 };
 
 // Minimal ABIs for backend reading & event verification
