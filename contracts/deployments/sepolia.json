@@ -1,0 +1,34 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "deployedAt": "2026-09-20T10:11:25.010Z",
+  "deployer": "0x5f2a6B32228A1B911128cB11Dd8E0ce94dd6b565",
+  "contracts": {
+    "MockUSDC": {
+      "address": "0xfaaF91778853F35FB7Db545dc3586aFc354103d0",
+      "txHash": "0x4787d9cc9c8dc9e4061addd9b38f9c80f3d0e57e8f14e4c35e8978b472392d9a"
+    },
+    "CreditRegistry": {
+      "address": "0x9b117D9528c43Fb2938e43172b1935f38F2C6f90",
+      "txHash": "0xe4aed1f3aabc7c59a5487bf7f02c5d735eb0ad06d60c41b017a769a4e44cf1f7"
+    },
+    "LendingPool": {
+      "address": "0x6c7540f597E70b983A19b3e9372d9cdDB062e4F5",
+      "txHash": "0x44affe46fa17f59bc4319e7d14cbb61bc283a238003d5db36d89ca53fa31358a"
+    },
+    "LoanManager": {
+      "address": "0x21b39401646D783690E3902C90963c711Ff7cC1C",
+      "txHash": "0x0bd69fb3dc113d22394dd21c861d86b946ab46a9b1938b4bc1af627bd2761d20"
+    }
+  },
+  "configurations": {
+    "CreditRegistry_setLoanManager": {
+      "txHash": "0x1951fe587120f76455d880138e1e38989935f329b6ef4b704af2622fc968b8be",
+      "target": "0x21b39401646D783690E3902C90963c711Ff7cC1C"
+    },
+    "LendingPool_setLoanManager": {
+      "txHash": "0x1fe8b29b0a0033399a14307f23f4515b66770310f1ce0a0ec8012abe0a72311a",
+      "target": "0x21b39401646D783690E3902C90963c711Ff7cC1C"
+    }
+  }
+}

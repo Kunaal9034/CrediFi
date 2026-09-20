@@ -1,10 +1,26 @@
 require("@nomicfoundation/hardhat-toolbox");
-require("dotenv").config();
+const path = require("path");
+
+// Load .env from contracts directory or monorepo root
+require("dotenv").config({ path: path.resolve(__dirname, ".env") });
+require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
 
 const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL || "https://eth-sepolia.g.alchemy.com/v2/demo";
-const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY && process.env.DEPLOYER_PRIVATE_KEY.length === 64
-  ? `0x${process.env.DEPLOYER_PRIVATE_KEY}`
-  : (process.env.DEPLOYER_PRIVATE_KEY || "0x0000000000000000000000000000000000000000000000000000000000000001");
+
+// Support DEPLOYER_PRIVATE_KEY or PRIVATE_KEY, with or without '0x' prefix
+function getDeployerKey() {
+  const rawKey = process.env.DEPLOYER_PRIVATE_KEY || process.env.PRIVATE_KEY;
+  if (!rawKey) {
+    return "0x0000000000000000000000000000000000000000000000000000000000000001";
+  }
+  const cleanKey = rawKey.startsWith("0x") ? rawKey.slice(2).trim() : rawKey.trim();
+  if (cleanKey.length === 64) {
+    return `0x${cleanKey}`;
+  }
+  return `0x${cleanKey}`;
+}
+
+const DEPLOYER_PRIVATE_KEY = getDeployerKey();
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
