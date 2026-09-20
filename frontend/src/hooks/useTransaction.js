@@ -55,16 +55,49 @@ export function useTransaction() {
         return txReceipt;
       } catch (err) {
         console.error('[useTransaction] Transaction error:', err);
-        let readableError = err.reason || err.shortMessage || err.message || 'Transaction rejected or failed';
+        let rawError = err.reason || err.data?.message || err.error?.message || err.shortMessage || err.message || '';
+        let readableError = 'Transaction rejected or failed';
+
+        // Check common failure modes
         if (
-          readableError.includes('user rejected') ||
-          readableError.includes('ACTION_REJECTED') ||
-          err.code === 4001
+          rawError.includes('user rejected') ||
+          rawError.includes('ACTION_REJECTED') ||
+          err.code === 4001 ||
+          err.code === 'ACTION_REJECTED'
         ) {
-          readableError = 'Transaction rejected in MetaMask';
-        } else if (readableError.toLowerCase().includes('insufficient funds')) {
-          readableError = 'Insufficient Sepolia ETH for gas fees';
+          readableError = 'Transaction cancelled: Rejected in MetaMask';
+        } else if (rawError.toLowerCase().includes('insufficient funds')) {
+          readableError = 'Insufficient Sepolia ETH for network gas fees';
+        } else if (rawError.includes('exceed borrowing limit') || rawError.includes('exceeds borrowing limit')) {
+          readableError = 'Transaction reverted: Requested amount exceeds your active borrowing power';
+        } else if (rawError.includes('active defaulted loans')) {
+          readableError = 'Transaction reverted: Account has defaulted loans and cannot borrow';
+        } else if (rawError.includes('Borrower cannot fund their own loan') || rawError.includes('Lender cannot be borrower')) {
+          readableError = 'Transaction reverted: Self-funding is prohibited (you cannot fund your own loan)';
+        } else if (rawError.includes('Only the borrower can repay this loan')) {
+          readableError = 'Transaction reverted: Only the original borrower can execute repayment';
+        } else if (rawError.includes('Loan is not in REQUESTED state')) {
+          readableError = 'Transaction reverted: Loan is no longer in REQUESTED state (already funded or cancelled)';
+        } else if (rawError.includes('Loan is not in ACTIVE state')) {
+          readableError = 'Transaction reverted: Loan is not currently ACTIVE';
+        } else if (rawError.includes('Grace period') || rawError.includes('grace period')) {
+          readableError = 'Transaction reverted: Loan cannot be marked defaulted until grace period expires';
+        } else if (rawError.includes('insufficient allowance') || rawError.includes('allowance')) {
+          readableError = 'Transaction failed: Insufficient mUSDC token allowance. Please approve mUSDC first.';
+        } else if (rawError.includes('transfer amount exceeds balance') || rawError.includes('exceeds balance')) {
+          readableError = 'Transaction failed: Insufficient mUSDC balance in wallet.';
+        } else if (rawError.includes('Amount exceeds faucet limit')) {
+          readableError = 'Faucet limit exceeded: Maximum 10,000 mUSDC per claim';
+        } else if (err.reason) {
+          readableError = `Contract Revert: ${err.reason}`;
+        } else if (err.shortMessage) {
+          readableError = err.shortMessage;
+        } else if (err.message) {
+          // Remove internal json-rpc error garbage if present
+          const cleanMsg = err.message.split('(')[0].trim();
+          readableError = cleanMsg.length > 5 ? cleanMsg : 'Transaction execution failed';
         }
+
         setError(readableError);
         setStatus('failed');
         throw new Error(readableError);

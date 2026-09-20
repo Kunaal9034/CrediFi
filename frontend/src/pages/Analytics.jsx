@@ -30,36 +30,36 @@ import {
 } from 'lucide-react';
 
 const DEFAULT_STATS = {
-  totalUsers: 14,
-  totalLoans: 18,
-  totalVolume: '5800000000', // 5,800 USDC
-  totalLent: '5800000000',
-  totalRepaid: '5250000000',
-  totalInterest: '480000000',
-  activeLoans: 4,
-  completedLoans: 13,
-  repaidLoans: 13,
-  defaultedLoans: 1,
-  repaymentRate: 92.8,
-  defaultRate: 7.2,
-  averageLoanAmount: '322000000',
-  averageInterestRate: 1120, // 11.2%
-  averageDurationDays: 14,
+  totalUsers: 0,
+  totalLoans: 0,
+  totalVolume: '0',
+  totalLent: '0',
+  totalRepaid: '0',
+  totalInterest: '0',
+  activeLoans: 0,
+  completedLoans: 0,
+  repaidLoans: 0,
+  defaultedLoans: 0,
+  repaymentRate: 100,
+  defaultRate: 0,
+  averageLoanAmount: '0',
+  averageInterestRate: 0,
+  averageDurationDays: 0,
 };
 
 const DEFAULT_VOLUME_HISTORY = [
-  { period: 'Wk 1', volumeFormatted: 800, cumulativeVolume: 800, loanCount: 3 },
-  { period: 'Wk 2', volumeFormatted: 1500, cumulativeVolume: 2300, loanCount: 4 },
-  { period: 'Wk 3', volumeFormatted: 1200, cumulativeVolume: 3500, loanCount: 4 },
-  { period: 'Wk 4', volumeFormatted: 1300, cumulativeVolume: 4800, loanCount: 4 },
-  { period: 'Wk 5', volumeFormatted: 1000, cumulativeVolume: 5800, loanCount: 3 },
+  { period: 'Wk 1', volumeFormatted: 0, cumulativeVolume: 0, loanCount: 0 },
+  { period: 'Wk 2', volumeFormatted: 0, cumulativeVolume: 0, loanCount: 0 },
+  { period: 'Wk 3', volumeFormatted: 0, cumulativeVolume: 0, loanCount: 0 },
+  { period: 'Wk 4', volumeFormatted: 0, cumulativeVolume: 0, loanCount: 0 },
+  { period: 'Wk 5', volumeFormatted: 0, cumulativeVolume: 0, loanCount: 0 },
 ];
 
 const DEFAULT_CREDIT_DISTRIBUTION = {
-  poor: 2,
-  fair: 5,
-  good: 4,
-  excellent: 3,
+  poor: 0,
+  fair: 0,
+  good: 0,
+  excellent: 0,
 };
 
 export default function Analytics() {

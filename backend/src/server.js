@@ -56,7 +56,7 @@ app.get('/api/health', (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     project: 'CrediFi',
-    tagline: 'Onchain Credit. Undercollateralized Lending.',
+    tagline: 'Onchain Credit. Credit-Based Lending.',
     hackathon: "Hack in Hills '26",
     healthCheck: '/api/health',
     documentation: '/docs',

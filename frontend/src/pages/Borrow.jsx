@@ -112,7 +112,7 @@ export default function Borrow() {
       <div className="mb-8">
         <div className="flex items-center space-x-2 text-xs font-mono uppercase tracking-wider text-cyan-400 mb-1">
           <Sparkles size={14} />
-          <span>Undercollateralized Lending Protocol</span>
+          <span>Credit-Based Lending Protocol • 0% Collateral</span>
         </div>
         <h1 className="text-3xl font-extrabold text-white tracking-tight">
           Request an Unsecured Loan

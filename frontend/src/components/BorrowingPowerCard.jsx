@@ -27,7 +27,7 @@ export default function BorrowingPowerCard({
             </div>
             <div>
               <h3 className="text-sm font-semibold text-slate-200">Available Borrowing Power</h3>
-              <p className="text-xs text-slate-400">Undercollateralized onchain liquidity</p>
+              <p className="text-xs text-slate-400">Unsecured onchain credit line</p>
             </div>
           </div>
           <span className="inline-flex items-center space-x-1 text-xs px-2.5 py-1 rounded-full bg-cyan-950/60 border border-cyan-800/40 text-cyan-300 font-medium">
@@ -78,7 +78,7 @@ export default function BorrowingPowerCard({
         to="/borrow"
         className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-semibold text-xs transition-all flex items-center justify-center space-x-2 shadow-lg shadow-cyan-500/15"
       >
-        <span>Request Undercollateralized Loan</span>
+        <span>Request Credit-Based Loan</span>
         <ArrowRight size={14} />
       </Link>
     </div>

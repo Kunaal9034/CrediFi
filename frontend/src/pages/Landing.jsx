@@ -19,7 +19,7 @@ export default function Landing() {
         <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-white mb-6 leading-tight">
           Onchain Credit. <br />
           <span className="bg-gradient-to-r from-blue-400 via-cyan-400 to-emerald-400 bg-clip-text text-transparent">
-            Undercollateralized Lending.
+            Credit-Based Lending.
           </span>
         </h1>
 
@@ -89,9 +89,9 @@ export default function Landing() {
             <div className="p-3 rounded-xl bg-cyan-500/10 text-cyan-400 w-fit mb-4">
               <Lock size={24} />
             </div>
-            <h3 className="text-lg font-bold text-white mb-2">Undercollateralized Loans</h3>
+            <h3 className="text-lg font-bold text-white mb-2">Unsecured Credit-Based Loans</h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Borrow up to your onchain credit limit without locking up 150%+ collateral. The smart contract validates requested amounts directly against your onchain profile.
+              Borrow up to your onchain credit limit with 0% collateral required. The smart contract validates requested amounts directly against your onchain profile and repayment track record.
             </p>
           </div>
 

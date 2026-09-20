@@ -206,7 +206,7 @@ export default function Dashboard() {
             handleActionCompleted();
           }}
           isProcessing={isPending}
-          emptyMessage="You have no loans yet. Visit the Borrow page to request undercollateralized liquidity."
+          emptyMessage="You have no loans yet. Visit the Borrow page to request credit-based liquidity."
         />
       </div>
     </div>
