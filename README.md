@@ -6,7 +6,7 @@
 > **Network:** Ethereum Sepolia Testnet (Chain ID: `11155111`)  
 > **Classification:** Hackathon Release Candidate / Protocol Prototype  
 
----
+--
 
 ## 1. Executive Summary
 
